@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
     const location = useLocation();
+    const { user, logout } = useAuth();
 
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,7 +19,7 @@ export default function Layout({ children }) {
             <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
                 <div className="p-6 border-b border-gray-100">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-sm">
                             W
                         </div>
                         <span className="text-xl font-bold text-gray-900 tracking-tight">Whatsme</span>
@@ -32,10 +34,10 @@ export default function Layout({ children }) {
                                 key={item.label}
                                 to={item.disabled ? '#' : item.path}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                                        ? 'bg-green-50 text-green-700'
-                                        : item.disabled
-                                            ? 'text-gray-400 cursor-not-allowed'
-                                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                    ? 'bg-green-50 text-green-700'
+                                    : item.disabled
+                                        ? 'text-gray-400 cursor-not-allowed'
+                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                     }`}
                             >
                                 <item.icon size={20} />
@@ -47,15 +49,23 @@ export default function Layout({ children }) {
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 mb-2">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                            US
+                            {user?.name?.charAt(0) || 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
-                            <p className="text-xs text-gray-500 truncate">admin@whatsme.app</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'Usuario'}</p>
+                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
                     </div>
+
+                    <button
+                        onClick={logout}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                        <LogOut size={16} />
+                        Cerrar Sesión
+                    </button>
                 </div>
             </aside>
 

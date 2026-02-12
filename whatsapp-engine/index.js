@@ -1,4 +1,6 @@
 const express = require('express');
+// Polyfill for Baileys which expects global crypto
+global.crypto = require('crypto');
 const cors = require('cors');
 const sessionManager = require('./SessionManager');
 

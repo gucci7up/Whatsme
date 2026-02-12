@@ -69,8 +69,9 @@ class SessionManager {
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'info' }),
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            browser: ["Whatsme", "Chrome", "122.0.6261.94"], // Modern Chrome version
             generateHighQualityLinkPreview: true,
+            syncFullHistory: false, // Don't sync full history to speed up initial connection
         });
 
         this.sessions.set(accountId, sock);

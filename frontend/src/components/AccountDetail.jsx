@@ -40,27 +40,24 @@ export default function AccountDetail() {
         return () => unsubscribe();
     }, [id]);
 
+    const [connecting, setConnecting] = useState(false);
+
     const connectSession = async () => {
         if (!account) return;
-        try {
-            // Trigger the engine to start session
-            // We need to call the engine directly now since we removed the backend
-            // For now, we assume the engine is exposed or we use a proxy
-            // Let's assume the user will configure the engine URL
-            // Or simpler: We just create the document state and the engine (watching Appwrite) *could* pick it up?
-            // Current engine implementation: API based. So we must call it.
+        setConnecting(true);
+        console.log('Iniciando conexión...');
 
-            // Using api.losmuchachos.es which should be mapped to the engine in Dokploy
+        try {
+            console.log('Enviando petición a https://api.losmuchachos.es/connect');
             await axios.post(`https://api.losmuchachos.es/connect`, {
                 accountId: account.$id
             });
-
-            // For production where ports might be blocked, we might need a better strategy (like a reverse proxy for the engine too)
-            // But for now, let's try direct call or assume /engine proxy
-
+            alert('Petición enviada. Espera el QR...');
         } catch (error) {
             console.error('Connection request failed:', error);
-            alert('No se pudo iniciar la conexión con el motor de WhatsApp. Asegúrate de que el motor esté corriendo.');
+            alert(`Error de conexión: ${error.message}. Revisa la consola.`);
+        } finally {
+            setConnecting(false);
         }
     };
 
@@ -118,10 +115,11 @@ export default function AccountDetail() {
                                             <p className="text-gray-500 mb-4">QR no disponible</p>
                                             <button
                                                 onClick={connectSession}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+                                                disabled={connecting}
+                                                className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors ${connecting ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
-                                                <RefreshCw size={18} />
-                                                Generar QR
+                                                <RefreshCw size={18} className={connecting ? 'animate-spin' : ''} />
+                                                {connecting ? 'Conectando...' : 'Generar QR'}
                                             </button>
                                         </div>
                                     )}

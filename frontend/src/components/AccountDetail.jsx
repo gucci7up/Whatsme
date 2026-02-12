@@ -50,8 +50,8 @@ export default function AccountDetail() {
             // Or simpler: We just create the document state and the engine (watching Appwrite) *could* pick it up?
             // Current engine implementation: API based. So we must call it.
 
-            // Using port 1993 to avoid conflicts
-            await axios.post(`${window.location.protocol}//${window.location.hostname}:1993/connect`, {
+            // Using api.losmuchachos.es which should be mapped to the engine in Dokploy
+            await axios.post(`https://api.losmuchachos.es/connect`, {
                 accountId: account.$id
             });
 

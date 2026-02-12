@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { Plus, Smartphone, ExternalLink, Activity } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://losmuchachos.es/api';
+const API_URL = '/api';
 
 export default function Dashboard() {
     const [accounts, setAccounts] = useState([]);

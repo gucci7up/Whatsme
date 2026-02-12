@@ -64,6 +64,24 @@ export default function AccountDetail() {
         }
     };
 
+    const disconnectSession = async () => {
+        if (!account) return;
+        if (!confirm('¿Seguro que quieres desconectar y resetear la sesión?')) return;
+
+        setConnecting(true);
+        try {
+            await axios.post(`https://api.losmuchachos.es/disconnect`, {
+                accountId: account.$id
+            });
+            alert('Sesión reseteada. Ahora puedes generar un nuevo QR.');
+        } catch (error) {
+            console.error('Disconnect failed:', error);
+            alert(`Error al desconectar: ${error.message}`);
+        } finally {
+            setConnecting(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">Cargando...</div>;
     if (!account) return <div className="p-8 text-center text-red-500">Cuenta no encontrada</div>;
 
@@ -98,17 +116,28 @@ export default function AccountDetail() {
                                         <Smartphone size={48} className="text-green-600" />
                                     </div>
                                     <h3 className="text-lg font-semibold text-green-700 mb-2">¡WhatsApp Conectado!</h3>
-                                    <p className="text-gray-600">El dispositivo está listo para enviar mensajes.</p>
+                                    <p className="text-gray-600 mb-6">El dispositivo está listo para enviar mensajes.</p>
+
+                                    <button
+                                        onClick={disconnectSession}
+                                        disabled={connecting}
+                                        className="text-red-600 hover:text-red-700 font-medium text-sm underline"
+                                    >
+                                        {connecting ? 'Desconectando...' : 'Desconectar / Resetear Sesión'}
+                                    </button>
                                 </div>
                             ) : (
                                 <>
                                     {account.qr_code ? (
-                                        <div className="bg-white p-4 rounded-lg shadow-sm">
-                                            {/* Appwrite sends data URL string, but react-qr-code takes text. 
-                                                If engine sends raw string, we use QRCode. 
-                                                If engine sends Data URL (which it does now), we should use an <img> tag!
-                                            */}
-                                            <img src={account.qr_code} alt="Scan QR" className="w-64 h-64" />
+                                        <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col items-center">
+                                            <img src={account.qr_code} alt="Scan QR" className="w-64 h-64 mb-4" />
+                                            <button
+                                                onClick={disconnectSession}
+                                                disabled={connecting}
+                                                className="text-red-500 hover:text-red-600 text-xs underline"
+                                            >
+                                                ¿QR Caducado? Generar nuevo
+                                            </button>
                                         </div>
                                     ) : (
                                         <div className="text-center py-12">

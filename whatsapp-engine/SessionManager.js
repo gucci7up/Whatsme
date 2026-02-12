@@ -47,8 +47,22 @@ class SessionManager {
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(`sessions/session_${accountId}`);
-        const { version, isLatest } = await fetchLatestBaileysVersion();
-        console.log(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
+
+        // Fetch version with timeout/fallback
+        let version, isLatest;
+        try {
+            console.log('Fetching latest WhatsApp version...');
+            const versionFetch = fetchLatestBaileysVersion();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Version fetch timeout')), 5000));
+            const result = await Promise.race([versionFetch, timeout]);
+            version = result.version;
+            isLatest = result.isLatest;
+            console.log(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
+        } catch (err) {
+            console.warn('Failed to fetch latest version, using fallback:', err.message);
+            version = [2, 3000, 1015901307]; // Fallback to a known recent version
+            isLatest = false;
+        }
 
         const sock = makeWASocket({
             version,

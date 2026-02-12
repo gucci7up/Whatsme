@@ -49,9 +49,10 @@ class SessionManager {
 
         const sock = makeWASocket({
             auth: state,
-            printQRInTerminal: true, // Changing to true to see if it logs in console at least
-            logger: pino({ level: 'info' }), // Changing to info to see internal baileys logs
-            browser: ["Whatsme", "Chrome", "1.0"]
+            printQRInTerminal: true,
+            logger: pino({ level: 'info' }),
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            generateHighQualityLinkPreview: true,
         });
 
         this.sessions.set(accountId, sock);

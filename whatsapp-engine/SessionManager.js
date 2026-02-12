@@ -46,8 +46,11 @@ class SessionManager {
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(`sessions/session_${accountId}`);
+        const { version, isLatest } = await fetchLatestBaileysVersion();
+        console.log(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
         const sock = makeWASocket({
+            version,
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'info' }),
@@ -86,6 +89,19 @@ class SessionManager {
                 const statusCode = disconnectError?.output?.statusCode;
 
                 console.error(`Connection Closed for ${accountId}. Status Code: ${statusCode}. Error:`, disconnectError);
+
+                // 405 Method Not Allowed typically means the session/version is rejected.
+                // We should probably clear session and retry.
+                if (statusCode === 405) {
+                    console.log(`Error 405 detected. Clearing session for ${accountId} and retrying...`);
+                    this.sessions.delete(accountId);
+                    const sessionDir = `sessions/session_${accountId}`;
+                    if (fs.existsSync(sessionDir)) {
+                        fs.rmSync(sessionDir, { recursive: true, force: true });
+                    }
+                    setTimeout(() => this.createSession(accountId), 2000);
+                    return;
+                }
 
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 console.log(`Should reconnect: ${shouldReconnect}`);

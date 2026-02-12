@@ -21,7 +21,18 @@ export default function Register() {
             navigate('/');
         } catch (err) {
             console.error("Registration Error:", err);
-            setError(err.message || 'Error al crear cuenta');
+            if (err.message.includes('already exists')) {
+                setError(
+                    <span>
+                        Ya existe una cuenta con este email. {' '}
+                        <Link to="/login" className="font-bold underline text-white hover:text-orange-400">
+                            Inicia Sesión aquí
+                        </Link>
+                    </span>
+                );
+            } else {
+                setError(err.message || 'Error al crear cuenta');
+            }
         } finally {
             setLoading(false);
         }

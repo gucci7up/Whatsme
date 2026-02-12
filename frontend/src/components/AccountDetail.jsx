@@ -50,8 +50,8 @@ export default function AccountDetail() {
             // Or simpler: We just create the document state and the engine (watching Appwrite) *could* pick it up?
             // Current engine implementation: API based. So we must call it.
 
-            // TODO: Ensure this URL is correct in production
-            await axios.post(`${window.location.protocol}//${window.location.hostname}:3000/connect`, {
+            // Using port 1993 to avoid conflicts
+            await axios.post(`${window.location.protocol}//${window.location.hostname}:1993/connect`, {
                 accountId: account.$id
             });
 
@@ -81,8 +81,8 @@ export default function AccountDetail() {
                         <p className="text-sm text-gray-500">ID: {account.$id}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${account.status === 'connected'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
                         }`}>
                         {account.status === 'connected' ? 'Conectado' : 'Desconectado'}
                     </span>

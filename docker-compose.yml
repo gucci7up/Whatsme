@@ -6,7 +6,7 @@ services:
     container_name: whatsapp-engine
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "1993:3000"
     volumes:
       - ./whatsapp-engine/sessions:/app/sessions
     networks:

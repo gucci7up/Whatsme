@@ -1,23 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { Plus, Smartphone, ExternalLink, Activity } from 'lucide-react';
-
-const API_URL = 'https://api.losmuchachos.es/api';
+import { Plus, User, Trash2, Smartphone } from 'lucide-react';
+import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
+import { ID, Query } from 'appwrite';
 
 export default function Dashboard() {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isCreating, setIsCreating] = useState(false);
-    const [newName, setNewName] = useState('');
-    const [newPhone, setNewPhone] = useState('');
 
     const fetchAccounts = async () => {
         try {
-            const res = await axios.get(`${API_URL}/accounts`);
-            setAccounts(res.data);
-        } catch (err) {
-            console.error(err);
+            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+                Query.orderDesc('$createdAt')
+            ]);
+            setAccounts(response.documents);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
         } finally {
             setLoading(false);
         }
@@ -27,82 +25,96 @@ export default function Dashboard() {
         fetchAccounts();
     }, []);
 
-    const handleCreate = async (e) => {
-        e.preventDefault();
+    const createAccount = async () => {
+        const clientName = prompt('Ingrese el nombre del cliente:');
+        if (!clientName) return;
+
         try {
-            await axios.post(`${API_URL}/accounts/create`, {
-                client_name: newName,
-                phone_number: newPhone
+            await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), {
+                client_name: clientName,
+                status: 'disconnected',
+                phone_number: '',
+                qr_code: null,
+                session_id: ID.unique() // Generate session ID for WhatsApp Engine
             });
-            setNewName('');
-            setNewPhone('');
-            setIsCreating(false);
-            fetchAccounts();
-        } catch (err) {
-            console.error(err);
-            alert('Failed to create account');
+            fetchAccounts(); // Refresh list
+        } catch (error) {
+            console.error('Error creating account:', error);
+            alert('Error al crear cuenta');
         }
     };
 
+    const deleteAccount = async (id, e) => {
+        e.preventDefault(); // Prevent navigation
+        if (!confirm('¿Estás seguro de eliminar esta cuenta?')) return;
+
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_ID, id);
+            setAccounts(accounts.filter(acc => acc.$id !== id));
+        } catch (error) {
+            console.error('Error deleting account:', error);
+        }
+    };
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Cargando cuentas...</div>;
+
     return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2>Accounts</h2>
-                <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
-                    <Plus size={18} /> New Account
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Cuentas de WhatsApp</h2>
+                <button
+                    onClick={createAccount}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <Plus size={20} />
+                    Nueva Cuenta
                 </button>
             </div>
 
-            {isCreating && (
-                <div className="card glass">
-                    <h3>Create New Account</h3>
-                    <form onSubmit={handleCreate} style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                        <input
-                            className="input"
-                            placeholder="Client Name"
-                            value={newName}
-                            onChange={e => setNewName(e.target.value)}
-                            required
-                        />
-                        <input
-                            className="input"
-                            placeholder="Phone Number (Optional)"
-                            value={newPhone}
-                            onChange={e => setNewPhone(e.target.value)}
-                        />
-                        <button type="submit" className="btn btn-primary">Create</button>
-                        <button type="button" className="btn" onClick={() => setIsCreating(false)}>Cancel</button>
-                    </form>
-                </div>
-            )}
-
-            {loading ? (
-                <p>Loading...</p>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                    {accounts.map(acc => (
-                        <div key={acc.id} className="card glass" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {accounts.map((account) => (
+                    <Link
+                        key={account.$id}
+                        to={`/account/${account.$id}`}
+                        className="border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-shadow relative group"
+                    >
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-3 rounded-full ${account.status === 'connected' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                    <User className={account.status === 'connected' ? 'text-green-600' : 'text-gray-500'} size={24} />
+                                </div>
                                 <div>
-                                    <h3 style={{ margin: 0 }}>{acc.client_name}</h3>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                        {acc.phone_number || 'No number'}
-                                    </div>
-                                </div>
-                                <div className={`badge ${acc.status === 'connected' ? 'badge-connected' : 'badge-disconnected'}`}>
-                                    {acc.status}
+                                    <h3 className="font-semibold text-gray-800">{account.client_name}</h3>
+                                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Smartphone size={14} />
+                                        {account.phone_number || 'Sin número'}
+                                    </p>
                                 </div>
                             </div>
-
-                            <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-                                <Link to={`/account/${acc.id}`} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                                    <Activity size={18} /> Manage
-                                </Link>
-                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${account.status === 'connected'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                {account.status === 'connected' ? 'Conectado' : 'Desconectado'}
+                            </span>
                         </div>
-                    ))}
-                </div>
-            )}
+
+                        <button
+                            onClick={(e) => deleteAccount(account.$id, e)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+                    </Link>
+                ))}
+
+                {accounts.length === 0 && (
+                    <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                        <p className="text-gray-500 mb-2">No hay cuentas configuradas</p>
+                        <p className="text-sm text-gray-400">Crea una nueva cuenta para comenzar</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

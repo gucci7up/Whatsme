@@ -6,31 +6,9 @@ services:
     container_name: whatsapp-engine
     restart: unless-stopped
     ports:
-      - "1993:3000"
+      - "3000:3000"
     volumes:
-      - ./docker/whatsapp-sessions:/app/sessions
-    environment:
-      - PORT=3000
-    networks:
-      - app-network
-
-  backend:
-    build: ./backend
-    container_name: whatsapp-backend
-    restart: unless-stopped
-    ports:
-      - "8000:80"
-    volumes:
-      - ./backend:/var/www/html
-    environment:
-      - DB_HOST=mysql
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASS}
-      - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3000
-    depends_on:
-      - mysql
-      - whatsapp-engine
+      - ./whatsapp-engine/sessions:/app/sessions
     networks:
       - app-network
 
@@ -40,27 +18,11 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
-    networks:
-      - app-network
-
-  mysql:
-    image: mysql:8.0
-    container_name: whatsapp-mysql
-    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASS}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASS}
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - VITE_API_URL=http://localhost:3000
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  db_data:

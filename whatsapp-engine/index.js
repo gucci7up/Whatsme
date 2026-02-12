@@ -20,18 +20,7 @@ app.post('/connect', async (req, res) => {
     }
 });
 
-app.get('/qr/:accountId', (req, res) => {
-    const { accountId } = req.params;
-    const qr = sessionManager.getQr(accountId);
 
-    if (qr === 'CONNECTED') {
-        res.status(200).json({ status: 'connected', qr: null });
-    } else if (qr) {
-        res.status(200).json({ status: 'scannable', qr });
-    } else {
-        res.status(404).json({ status: 'not_found', message: 'Session not found or QR not ready' });
-    }
-});
 
 app.post('/send-message', async (req, res) => {
     const { accountId, recipient, content } = req.body;

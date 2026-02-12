@@ -168,7 +168,7 @@ export default function AccountDetail() {
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Información de la Sesión</h3>
-                                <div className="bg-gray-50 rounded-lg p-4 space-y-3 font-mono text-sm">
+                                <div className="bg-gray-50 rounded-lg p-4 space-y-3 font-mono text-sm border border-gray-200">
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Estado:</span>
                                         <span className="font-medium text-gray-900">{account.status}</span>
@@ -182,6 +182,42 @@ export default function AccountDetail() {
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Teléfono:</span>
                                         <span className="font-medium text-gray-900">{account.phone_number || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Developer API Section */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">DEV</span>
+                                    API & Tokens
+                                </h3>
+                                <div className="bg-slate-900 rounded-lg p-4 text-slate-300 text-xs font-mono overflow-x-auto">
+                                    <div className="mb-3">
+                                        <p className="text-slate-500 mb-1">Instance ID (Token)</p>
+                                        <div className="flex items-center justify-between bg-slate-800 p-2 rounded border border-slate-700">
+                                            <span>{account.$id}</span>
+                                            <button
+                                                onClick={() => navigator.clipboard.writeText(account.$id)}
+                                                className="text-blue-400 hover:text-blue-300 ml-2"
+                                                title="Copiar Token"
+                                            >
+                                                COPY
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-slate-500 mb-1">Ejemplo de Uso (cURL)</p>
+                                        <pre className="bg-slate-800 p-2 rounded border border-slate-700 whitespace-pre-wrap break-all">
+                                            {`curl -X POST https://api.losmuchachos.es/send-message \\
+-H "Content-Type: application/json" \\
+-d '{
+  "accountId": "${account.$id}",
+  "recipient": "1234567890",
+  "content": "Hola Mundo"
+}'`}
+                                        </pre>
                                     </div>
                                 </div>
                             </div>

@@ -40,13 +40,18 @@ class SessionManager {
             return this.sessions.get(accountId);
         }
 
+        // Ensure sessions directory exists
+        if (!fs.existsSync('sessions')) {
+            fs.mkdirSync('sessions');
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(`sessions/session_${accountId}`);
 
         const sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false,
-            logger: pino({ level: 'silent' }),
-            browser: ["WhatsApp API", "Chrome", "1.0"]
+            printQRInTerminal: true, // Changing to true to see if it logs in console at least
+            logger: pino({ level: 'info' }), // Changing to info to see internal baileys logs
+            browser: ["Whatsme", "Chrome", "1.0"]
         });
 
         this.sessions.set(accountId, sock);
@@ -58,23 +63,35 @@ class SessionManager {
 
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            console.log(`Connection Update for ${accountId}:`, JSON.stringify({ connection, qr: !!qr, lastDisconnect_error_status: lastDisconnect?.error?.output?.statusCode }, null, 2));
 
             if (qr) {
                 // Generate QR as Data URL and push to Appwrite
-                const qrCode = await QRCode.toDataURL(qr);
-                console.log(`QR generated for account ${accountId}`);
-                await this.updateDocument(accountId, {
-                    qr_code: qrCode,
-                    status: 'scanning'
-                });
+                console.log(`QR Code received for ${accountId}. Generating image...`);
+                try {
+                    const qrCode = await QRCode.toDataURL(qr);
+                    console.log(`QR generated successfully. Updating Appwrite...`);
+                    await this.updateDocument(accountId, {
+                        qr_code: qrCode,
+                        status: 'scanning'
+                    });
+                } catch (qrErr) {
+                    console.error('QR Generation Error:', qrErr);
+                }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log(`Connection closed for account ${accountId}, reconnecting: ${shouldReconnect}`);
+                const disconnectError = lastDisconnect?.error;
+                const statusCode = disconnectError?.output?.statusCode;
+
+                console.error(`Connection Closed for ${accountId}. Status Code: ${statusCode}. Error:`, disconnectError);
+
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                console.log(`Should reconnect: ${shouldReconnect}`);
 
                 if (shouldReconnect) {
-                    this.createSession(accountId);
+                    // Retry with delay
+                    setTimeout(() => this.createSession(accountId), 2000);
                 } else {
                     this.sessions.delete(accountId);
                     console.log(`Account ${accountId} logged out.`);

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, User, Trash2, Smartphone } from 'lucide-react';
-import { databases, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
+import { Plus, Users, Globe, WifiOff } from 'lucide-react';
+import { databases, client, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
+import AccountCard from './AccountCard';
+import Modal from './ui/Modal';
+import CreateAccountModal from './CreateAccountModal';
 
 export default function Dashboard() {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const fetchAccounts = async () => {
         try {
@@ -23,12 +26,26 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchAccounts();
+
+        // Global Realtime Subscription for Account List
+        const unsubscribe = client.subscribe(
+            `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents`,
+            (response) => {
+                const { events, payload } = response;
+                if (events.includes('databases.*.collections.*.documents.*.create')) {
+                    setAccounts(prev => [payload, ...prev]);
+                } else if (events.includes('databases.*.collections.*.documents.*.update')) {
+                    setAccounts(prev => prev.map(acc => acc.$id === payload.$id ? payload : acc));
+                } else if (events.includes('databases.*.collections.*.documents.*.delete')) {
+                    setAccounts(prev => prev.filter(acc => acc.$id !== payload.$id));
+                }
+            }
+        );
+
+        return () => unsubscribe();
     }, []);
 
-    const createAccount = async () => {
-        const clientName = prompt('Ingrese el nombre del cliente:');
-        if (!clientName) return;
-
+    const createAccount = async (clientName) => {
         try {
             await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), {
                 client_name: clientName,
@@ -37,7 +54,7 @@ export default function Dashboard() {
                 qr_code: null,
                 session_id: ID.unique() // Generate session ID for WhatsApp Engine
             });
-            fetchAccounts(); // Refresh list
+            // Realtime will handle the list update
         } catch (error) {
             console.error('Error creating account:', error);
             alert('Error al crear cuenta');
@@ -45,76 +62,94 @@ export default function Dashboard() {
     };
 
     const deleteAccount = async (id, e) => {
-        e.preventDefault(); // Prevent navigation
-        if (!confirm('¿Estás seguro de eliminar esta cuenta?')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm('¿Estás seguro de eliminar esta cuenta? Esta acción no se puede deshacer.')) return;
 
         try {
             await databases.deleteDocument(DATABASE_ID, COLLECTION_ID, id);
-            setAccounts(accounts.filter(acc => acc.$id !== id));
+            // Realtime will handle the list update
+
+            // Optional: Call Internal API to clean up sessions on Engine side if needed
+            // But usually Engine cleans up or we can manual triggers
         } catch (error) {
             console.error('Error deleting account:', error);
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Cargando cuentas...</div>;
+    if (loading) return <div className="p-12 text-center text-gray-500 animate-pulse">Cargando ecosistema...</div>;
+
+    // Stats Configuration
+    const stats = [
+        { label: 'Total Cuentas', value: accounts.length, icon: Users, color: 'bg-blue-100 text-blue-600' },
+        { label: 'Conectadas (Online)', value: accounts.filter(a => a.status === 'connected').length, icon: Globe, color: 'bg-green-100 text-green-600' },
+        { label: 'Desconectadas', value: accounts.filter(a => a.status !== 'connected').length, icon: WifiOff, color: 'bg-red-100 text-red-600' },
+    ];
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div>
+            {/* Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                {stats.map((stat) => (
+                    <div key={stat.label} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500 mb-1">{stat.label}</p>
+                            <p className="text-3xl font-bold text-gray-800">{stat.value}</p>
+                        </div>
+                        <div className={`p-4 rounded-lg ${stat.color}`}>
+                            <stat.icon size={24} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Cuentas de WhatsApp</h2>
+                <h2 className="text-xl font-bold text-gray-800">Cuentas Registradas</h2>
                 <button
-                    onClick={createAccount}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm hover:shadow-md"
                 >
                     <Plus size={20} />
-                    Nueva Cuenta
+                    Nueva Instancia
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {accounts.map((account) => (
-                    <Link
+                    <AccountCard
                         key={account.$id}
-                        to={`/account/${account.$id}`}
-                        className="border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-shadow relative group"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-3 rounded-full ${account.status === 'connected' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                    <User className={account.status === 'connected' ? 'text-green-600' : 'text-gray-500'} size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-800">{account.client_name}</h3>
-                                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                                        <Smartphone size={14} />
-                                        {account.phone_number || 'Sin número'}
-                                    </p>
-                                </div>
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${account.status === 'connected'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-yellow-100 text-yellow-700'
-                                }`}>
-                                {account.status === 'connected' ? 'Conectado' : 'Desconectado'}
-                            </span>
-                        </div>
-
-                        <button
-                            onClick={(e) => deleteAccount(account.$id, e)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <Trash2 size={18} />
-                        </button>
-                    </Link>
+                        account={account}
+                        onDelete={deleteAccount}
+                    />
                 ))}
 
+                {/* Empty State Card */}
                 {accounts.length === 0 && (
-                    <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                        <p className="text-gray-500 mb-2">No hay cuentas configuradas</p>
-                        <p className="text-sm text-gray-400">Crea una nueva cuenta para comenzar</p>
+                    <div
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="col-span-full border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-400 hover:bg-gray-50 transition-all cursor-pointer group"
+                    >
+                        <div className="p-4 bg-gray-100 rounded-full mb-4 group-hover:bg-white transition-colors">
+                            <Plus size={32} />
+                        </div>
+                        <p className="text-lg font-medium">No hay instancias activas</p>
+                        <p className="text-sm">Haz clic para crear tu primera conexión de WhatsApp</p>
                     </div>
                 )}
             </div>
+
+            {/* Create Account Modal */}
+            <Modal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                title="Crear Nueva Instancia"
+            >
+                <CreateAccountModal
+                    isOpen={isCreateModalOpen}
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onCreate={createAccount}
+                />
+            </Modal>
         </div>
     );
 }

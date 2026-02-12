@@ -5,8 +5,12 @@ import { ID, Query } from 'appwrite';
 import AccountCard from './AccountCard';
 import Modal from './ui/Modal';
 import CreateAccountModal from './CreateAccountModal';
+import { useAuth } from '../context/AuthContext';
+
+const ADMIN_EMAIL = 'gucci7up@gmail.com';
 
 export default function Dashboard() {
+    const { user } = useAuth();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -52,12 +56,17 @@ export default function Dashboard() {
                 status: 'disconnected',
                 phone_number: '',
                 qr_code: null,
-                session_id: ID.unique() // Generate session ID for WhatsApp Engine
+                session_id: ID.unique(), // Generate session ID for WhatsApp Engine
+                user_email: user.email // Assign owner
             });
             // Realtime will handle the list update
         } catch (error) {
             console.error('Error creating account:', error);
-            alert('Error al crear cuenta');
+            if (error.message.includes('Attribute not found')) {
+                alert('Error: Falta el atributo "user_email" en Appwrite. Contacta al admin.');
+            } else {
+                alert('Error al crear cuenta: ' + error.message);
+            }
         }
     };
 
@@ -77,13 +86,26 @@ export default function Dashboard() {
         }
     };
 
+    // Filter Accounts based on Role
+    const filteredAccounts = accounts.filter(account => {
+        // Admin sees everything
+        if (user?.email === ADMIN_EMAIL) return true;
+        // User sees only their accounts
+        if (account.user_email === user?.email) return true;
+
+        // Handling legacy accounts (no user_email):
+        // If user is Admin, they fall into first case (true).
+        // If user is NOT Admin, they should NOT see them.
+        return false;
+    });
+
     if (loading) return <div className="p-12 text-center text-gray-500 animate-pulse">Cargando ecosistema...</div>;
 
-    // Stats Configuration
+    // Stats Configuration (Based on Filtered Accounts)
     const stats = [
-        { label: 'Total Cuentas', value: accounts.length, icon: Users, color: 'bg-blue-100 text-blue-600' },
-        { label: 'Conectadas (Online)', value: accounts.filter(a => a.status === 'connected').length, icon: Activity, color: 'bg-green-100 text-green-600' },
-        { label: 'Desconectadas', value: accounts.filter(a => a.status !== 'connected').length, icon: Ban, color: 'bg-red-100 text-red-600' },
+        { label: 'Total Cuentas', value: filteredAccounts.length, icon: Users, color: 'bg-blue-100 text-blue-600' },
+        { label: 'Conectadas (Online)', value: filteredAccounts.filter(a => a.status === 'connected').length, icon: Activity, color: 'bg-green-100 text-green-600' },
+        { label: 'Desconectadas', value: filteredAccounts.filter(a => a.status !== 'connected').length, icon: Ban, color: 'bg-red-100 text-red-600' },
     ];
 
     return (
@@ -115,7 +137,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {accounts.map((account) => (
+                {filteredAccounts.map((account) => (
                     <AccountCard
                         key={account.$id}
                         account={account}
@@ -124,7 +146,7 @@ export default function Dashboard() {
                 ))}
 
                 {/* Empty State Card */}
-                {accounts.length === 0 && (
+                {filteredAccounts.length === 0 && (
                     <div
                         onClick={() => setIsCreateModalOpen(true)}
                         className="col-span-full border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-400 hover:bg-gray-50 transition-all cursor-pointer group"
@@ -132,7 +154,7 @@ export default function Dashboard() {
                         <div className="p-4 bg-gray-100 rounded-full mb-4 group-hover:bg-white transition-colors">
                             <Plus size={32} />
                         </div>
-                        <p className="text-lg font-medium">No hay instancias activas</p>
+                        <p className="text-lg font-medium">No tienes instancias activas</p>
                         <p className="text-sm">Haz clic para crear tu primera conexión de WhatsApp</p>
                     </div>
                 )}

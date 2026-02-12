@@ -28,10 +28,13 @@ export default function AccountDetail() {
         fetchAccount();
 
         // Realtime Subscription
+        console.log(`Suscribiéndose a databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${id}`);
         const unsubscribe = client.subscribe(
             `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${id}`,
             (response) => {
+                console.log('Evento Realtime recibido:', response);
                 if (response.events.includes('databases.*.collections.*.documents.*.update')) {
+                    console.log('Actualizando cuenta con payload:', response.payload);
                     setAccount(response.payload);
                 }
             }

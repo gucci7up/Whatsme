@@ -12,12 +12,14 @@ app.use(express.json());
 
 app.post('/connect', async (req, res) => {
     const { accountId } = req.body;
+    console.log(`Received connect request for account: ${accountId}`); // Log entry
     if (!accountId) return res.status(400).json({ error: 'accountId required' });
 
     try {
         await sessionManager.createSession(accountId);
         res.json({ message: 'Session initialization started' });
     } catch (err) {
+        console.error('Error in /connect:', err); // Log the actual error causing 500
         res.status(500).json({ error: err.message });
     }
 });

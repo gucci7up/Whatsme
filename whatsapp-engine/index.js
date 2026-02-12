@@ -24,6 +24,20 @@ app.post('/connect', async (req, res) => {
     }
 });
 
+app.post('/disconnect', async (req, res) => {
+    const { accountId } = req.body;
+    console.log(`Received disconnect request for account: ${accountId}`);
+    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+
+    try {
+        await sessionManager.deleteSession(accountId);
+        res.json({ message: 'Session disconnected and reset' });
+    } catch (err) {
+        console.error('Error in /disconnect:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 
 app.post('/send-message', async (req, res) => {

@@ -7,6 +7,9 @@ RUN a2enmod rewrite
 # Allow .htaccess overrides
 RUN sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
+# Copy custom VirtualHost
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+
 COPY . /var/www/html/
 
 WORKDIR /var/www/html

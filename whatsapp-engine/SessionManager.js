@@ -151,6 +151,31 @@ class SessionManager {
 
         await sock.sendMessage(jid, { text });
     }
+
+    async deleteSession(accountId) {
+        console.log(`Deleting session for ${accountId}`);
+
+        // 1. Close socket if exists
+        if (this.sessions.has(accountId)) {
+            const sock = this.sessions.get(accountId);
+            sock.end(undefined); // Close connection
+            this.sessions.delete(accountId);
+        }
+
+        // 2. Delete session files
+        const sessionDir = `sessions/session_${accountId}`;
+        if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+        }
+
+        // 3. Update Appwrite status
+        await this.updateDocument(accountId, {
+            status: 'disconnected',
+            qr_code: null
+        });
+
+        console.log(`Session ${accountId} deleted and status reset.`);
+    }
 }
 
 module.exports = new SessionManager();

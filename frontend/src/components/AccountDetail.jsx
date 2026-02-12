@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import { Send, RefreshCw, Power } from 'lucide-react';
 
-const API_URL = '/api';
+const API_URL = 'https://api.losmuchachos.es/api';
 
 export default function AccountDetail() {
     const { id } = useParams();

@@ -8,13 +8,6 @@ export default defineConfig({
         host: true,
         port: 5173,
         allowedHosts: ['losmuchachos.es'],
-        proxy: {
-            '/api': {
-                target: 'http://backend:80',
-                changeOrigin: true,
-                secure: false,
-            }
-        },
         watch: {
             usePolling: true
         }

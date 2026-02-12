@@ -20,7 +20,8 @@ export default function Register() {
             await register(email, password, name);
             navigate('/');
         } catch (err) {
-            setError('Error al crear cuenta');
+            console.error("Registration Error:", err);
+            setError(err.message || 'Error al crear cuenta');
         } finally {
             setLoading(false);
         }

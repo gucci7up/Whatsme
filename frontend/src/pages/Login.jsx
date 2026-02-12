@@ -19,7 +19,8 @@ export default function Login() {
             await login(email, password);
             navigate('/');
         } catch (err) {
-            setError('Credenciales inválidas');
+            console.error("Login Error:", err);
+            setError(err.message || 'Credenciales inválidas');
         } finally {
             setLoading(false);
         }

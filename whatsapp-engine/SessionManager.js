@@ -91,11 +91,13 @@ class SessionManager {
 
                 console.error(`Connection Closed for ${accountId}. Status Code: ${statusCode}. Error:`, disconnectError);
 
+                // Always remove the closed socket from memory so createSession makes a new one
+                this.sessions.delete(accountId);
+
                 // 405 Method Not Allowed typically means the session/version is rejected.
                 // We should probably clear session and retry.
                 if (statusCode === 405) {
                     console.log(`Error 405 detected. Clearing session for ${accountId} and retrying...`);
-                    this.sessions.delete(accountId);
                     const sessionDir = `sessions/session_${accountId}`;
                     if (fs.existsSync(sessionDir)) {
                         fs.rmSync(sessionDir, { recursive: true, force: true });
@@ -111,7 +113,6 @@ class SessionManager {
                     // Retry with delay
                     setTimeout(() => this.createSession(accountId), 2000);
                 } else {
-                    this.sessions.delete(accountId);
                     console.log(`Account ${accountId} logged out.`);
                     await this.updateDocument(accountId, {
                         status: 'disconnected',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Globe, WifiOff } from 'lucide-react';
+import { Plus, Users, Activity, Ban } from 'lucide-react';
 import { databases, client, DATABASE_ID, COLLECTION_ID } from '../lib/appwrite';
 import { ID, Query } from 'appwrite';
 import AccountCard from './AccountCard';
@@ -82,8 +82,8 @@ export default function Dashboard() {
     // Stats Configuration
     const stats = [
         { label: 'Total Cuentas', value: accounts.length, icon: Users, color: 'bg-blue-100 text-blue-600' },
-        { label: 'Conectadas (Online)', value: accounts.filter(a => a.status === 'connected').length, icon: Globe, color: 'bg-green-100 text-green-600' },
-        { label: 'Desconectadas', value: accounts.filter(a => a.status !== 'connected').length, icon: WifiOff, color: 'bg-red-100 text-red-600' },
+        { label: 'Conectadas (Online)', value: accounts.filter(a => a.status === 'connected').length, icon: Activity, color: 'bg-green-100 text-green-600' },
+        { label: 'Desconectadas', value: accounts.filter(a => a.status !== 'connected').length, icon: Ban, color: 'bg-red-100 text-red-600' },
     ];
 
     return (

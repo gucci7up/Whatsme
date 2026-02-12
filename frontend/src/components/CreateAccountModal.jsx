@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { database } from 'lucide-react'; // Fallback icon
 
 export default function CreateAccountModal({ isOpen, onClose, onCreate }) {
     const [clientName, setClientName] = useState('');

@@ -20,66 +20,68 @@ app.post('/connect', async (req, res) => {
         res.json({ message: 'Session initialization started' });
     } catch (err) {
         console.error('Error in /connect:', err); // Log the actual error causing 500
-        res.status(500).json({ error: err.message });
-    }
-});
+        app.use(cors());
 
-app.post('/disconnect', async (req, res) => {
-    const { accountId } = req.body;
-    console.log(`Received disconnect request for account: ${accountId}`);
-    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+        // Initialize Manager
+        SessionManager.initialize();
 
-    try {
-        await sessionManager.deleteSession(accountId);
-        res.json({ message: 'Session disconnected and reset' });
-    } catch (err) {
-        console.error('Error in /disconnect:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+        // --- Routes ---
 
+        app.post('/create-session', async (req, res) => {
+            const { accountId } = req.body;
+            try {
+                await SessionManager.getClient(accountId);
+                res.json({ success: true, message: 'Session initialization started' });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
 
+        app.post('/get-chats', async (req, res) => {
+            const { accountId } = req.body;
+            try {
+                const chats = await SessionManager.getChats(accountId);
+                res.json(chats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
 
-app.post('/get-chats', async (req, res) => {
-    const { accountId } = req.body;
-    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+        app.post('/get-messages', async (req, res) => {
+            const { accountId, chatId, limit } = req.body;
+            try {
+                const messages = await SessionManager.getMessages(accountId, chatId, limit);
+                res.json(messages);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
 
-    try {
-        const chats = await sessionManager.getChats(accountId);
-        res.json(chats);
-    } catch (err) {
-        console.error('Error in /get-chats:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+        app.post('/send-message', async (req, res) => {
+            const { accountId, recipient, content } = req.body;
+            try {
+                await SessionManager.sendMessage(accountId, recipient, content);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
 
-app.post('/get-messages', async (req, res) => {
-    const { accountId, chatId, limit } = req.body;
-    if (!accountId || !chatId) return res.status(400).json({ error: 'accountId and chatId required' });
+        app.post('/delete-session', async (req, res) => {
+            const { accountId } = req.body;
+            try {
+                await SessionManager.deleteSession(accountId);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
 
-    try {
-        const messages = await sessionManager.getMessages(accountId, chatId, limit);
-        res.json(messages);
-    } catch (err) {
-        console.error('Error in /get-messages:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+        app.get('/', (req, res) => {
+            res.send('Whatsme Engine v2.0 (Appwrite Edition) is running');
+        });
 
-app.post('/send-message', async (req, res) => {
-    const { accountId, recipient, content } = req.body;
-    if (!accountId || !recipient || !content) {
-        return res.status(400).json({ error: 'Missing parameters' });
-    }
-
-    try {
-        await sessionManager.sendMessage(accountId, recipient, content);
-        res.json({ success: true, message: 'Message sent' });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`WhatsApp Engine running on port ${PORT}`);
-});
+        const PORT = 3000;
+        app.listen(PORT, () => {
+            console.log(`WhatsApp Engine v2 listening on port ${PORT}`);
+        });

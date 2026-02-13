@@ -1,5 +1,4 @@
-// import { LayoutDashboard, MessageSquare, Settings, LogOut } from 'lucide-react';
-import { LogOut } from 'lucide-react'; // Keep LogOut for now as it's used below
+import { LayoutDashboard, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
@@ -7,9 +6,9 @@ export default function Layout({ children }) {
     const { user, logout } = useAuth();
 
     const menuItems = [
-        { path: '/', label: 'Dashboard' },
-        { path: '/messages', label: 'Mensajes' },
-        { path: '/settings', label: 'Configuración' },
+        { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+        { path: '/messages', icon: MessageSquare, label: 'Mensajes' },
+        { path: '/settings', icon: Settings, label: 'Configuración' },
     ];
 
     return (
@@ -39,7 +38,7 @@ export default function Layout({ children }) {
                                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                     }`}
                             >
-                                {/* <item.icon size={20} /> */}
+                                <item.icon size={20} />
                                 {item.label}
                                 {item.disabled && <span className="ml-auto text-[10px] bg-gray-100 px-2 py-0.5 rounded-full text-gray-500">PRO</span>}
                             </Link>

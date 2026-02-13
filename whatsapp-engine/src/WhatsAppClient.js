@@ -23,6 +23,16 @@ class WhatsAppClient {
     async initialize() {
         console.log(`[${this.sessionId}] Initializing client v2.0...`);
 
+        // Cleanup existing socket if any to prevent duplicate listeners
+        if (this.sock) {
+            try {
+                this.sock.end(undefined);
+                this.sock.ev.removeAllListeners('connection.update');
+                this.sock.ev.removeAllListeners('creds.update');
+                this.sock.ev.removeAllListeners('messages.upsert');
+            } catch (e) { }
+        }
+
         const { state, saveCreds } = await useAppwriteAuthState(this.sessionId);
         const { version } = await fetchLatestBaileysVersion();
 

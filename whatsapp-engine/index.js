@@ -16,10 +16,9 @@ SessionManager.initialize().catch(console.error);
 app.post('/create-session', async (req, res) => {
     const { accountId } = req.body;
     try {
-        await SessionManager.getClient(accountId);
+        await SessionManager.getClient(accountId, true); // Force Re-init
         res.json({ success: true, message: 'Session initialization started' });
     } catch (error) {
-        console.error('Create Session Error:', error);
         res.status(500).json({ error: error.message });
     }
 });

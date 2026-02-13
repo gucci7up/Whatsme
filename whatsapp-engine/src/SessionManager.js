@@ -12,12 +12,18 @@ class SessionManager {
         console.log('Initializing SessionManager...');
     }
 
-    async getClient(sessionId) {
+    async getClient(sessionId, forceInit = false) {
+        let client;
         if (this.clients.has(sessionId)) {
-            return this.clients.get(sessionId);
+            client = this.clients.get(sessionId);
+            if (forceInit) {
+                console.log(`[${sessionId}] Forcing re-initialization...`);
+                await client.initialize();
+            }
+            return client;
         }
 
-        const client = new WhatsAppClient(sessionId);
+        client = new WhatsAppClient(sessionId);
         await client.initialize();
         this.clients.set(sessionId, client);
         return client;

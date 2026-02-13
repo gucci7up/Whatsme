@@ -1,4 +1,4 @@
-import { LayoutDashboard, MessageSquare, Settings, LogOut, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
@@ -8,7 +8,6 @@ export default function Layout({ children }) {
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Mensajes' },
-        // { path: '/docs', icon: HelpCircle, label: 'Documentación' }, // Commented out
         { path: '/settings', icon: Settings, label: 'Configuración' },
     ];
 

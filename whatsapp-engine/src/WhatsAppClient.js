@@ -30,7 +30,7 @@ class WhatsAppClient {
             version,
             auth: state,
             printQRInTerminal: true,
-            logger: pino({ level: 'silent' }), // Reduce noise
+            logger: pino({ level: 'info' }), // Enable logs for debugging
             browser: Browsers.macOS('Chrome'),
             generateHighQualityLinkPreview: true,
             syncFullHistory: false, // CRITICAL: Lazy loading to prevent hanging

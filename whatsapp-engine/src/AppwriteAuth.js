@@ -1,45 +1,38 @@
 const { initAuthCreds, BufferJSON, proto } = require('@whiskeysockets/baileys');
 const { databases, DATABASE_ID, CREDS_COLLECTION_ID } = require('./config');
-const { ID, Permission, Role } = require('node-appwrite');
+const { ID } = require('node-appwrite');
 
 module.exports = async function useAppwriteAuthState(sessionId) {
-    // Helper to generate a safe Document ID
-    const getDocId = (type, id) => {
-        // Appwrite IDs must be chars/nums/hyphens/underscores, max 36 chars.
-        // We hash or sanitize the ID. 
-        // Simple sanitization: 
-        const cleanId = `${sessionId}_${type}_${id || ''}`.replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 36);
-        return cleanId;
-    };
+    // Cache for write buffering
+    const writeCache = {};
+    const writeDebounce = {};
 
-    // Helper: Read/Write to Appwrite
-    const readData = async (type, id) => {
+    // Helper: Read/Write Category Document
+    // Key format: session:{sessionId}:category:{category}
+    // We store ALL keys of a category in ONE document to minimize requests.
+    const getCategoryKey = (category) => `${sessionId}:cat:${category}`;
+
+    const readCategory = async (category) => {
+        const key = getCategoryKey(category);
         try {
-            // We search for the document by a custom attribute 'key_id' because Document ID has length limits
-            // actually, let's try to just use a deterministic ID if possible, or Query.
-            // For robustness, let's use a "key" string attribute.
-            const key = `${sessionId}:${type}:${id || ''}`;
             const result = await databases.listDocuments(
                 DATABASE_ID,
                 CREDS_COLLECTION_ID,
-                [
-                    // We assume 'key' attribute exists and is indexed
-                    require('node-appwrite').Query.equal('key', key)
-                ]
+                [require('node-appwrite').Query.equal('key', key)]
             );
 
             if (result.documents.length > 0) {
-                const doc = result.documents[0];
-                return JSON.parse(doc.data, BufferJSON.reviver);
+                return JSON.parse(result.documents[0].data, BufferJSON.reviver);
             }
-            return null;
+            return {};
         } catch (error) {
-            return null;
+            console.error(`Error reading category ${category}:`, error.message);
+            return {};
         }
     };
 
-    const writeData = async (type, id, data) => {
-        const key = `${sessionId}:${type}:${id || ''}`;
+    const writeCategory = async (category, data) => {
+        const key = getCategoryKey(category);
         const stringified = JSON.stringify(data, BufferJSON.replacer);
 
         try {
@@ -72,64 +65,99 @@ module.exports = async function useAppwriteAuthState(sessionId) {
                 );
             }
         } catch (error) {
-            console.error(`Error writing auth data ${key}:`, error);
+            console.error(`Error writing category ${category}:`, error.message);
         }
     };
 
-    const removeData = async (type, id) => {
-        const key = `${sessionId}:${type}:${id || ''}`;
-        try {
-            const result = await databases.listDocuments(
-                DATABASE_ID,
-                CREDS_COLLECTION_ID,
-                [require('node-appwrite').Query.equal('key', key)]
-            );
-            if (result.documents.length > 0) {
-                await databases.deleteDocument(DATABASE_ID, CREDS_COLLECTION_ID, result.documents[0].$id);
-            }
-        } catch (error) {
-            // Ignore (maybe already deleted)
+    // Load Creds (separate singular key)
+    let creds;
+    const credsKey = `${sessionId}:creds`;
+    try {
+        const result = await databases.listDocuments(
+            DATABASE_ID,
+            CREDS_COLLECTION_ID,
+            [require('node-appwrite').Query.equal('key', credsKey)]
+        );
+        if (result.documents.length > 0) {
+            creds = JSON.parse(result.documents[0].data, BufferJSON.reviver);
         }
-    };
+    } catch (e) { }
 
-    // 1. Load or Init Creds
-    const creds = (await readData('creds')) || initAuthCreds();
+    if (!creds) {
+        creds = initAuthCreds();
+    }
 
     return {
         state: {
             creds,
             keys: {
                 get: async (type, ids) => {
+                    // Read the whole category
+                    const categoryData = await readCategory(type);
                     const data = {};
-                    await Promise.all(
-                        ids.map(async (id) => {
-                            let value = await readData(type, id);
-                            if (type === 'app-state-sync-key' && value) {
-                                value = proto.Message.AppStateSyncKeyData.fromObject(value);
-                            }
-                            data[id] = value;
-                        })
-                    );
+                    ids.forEach(id => {
+                        let value = categoryData[id];
+                        if (type === 'app-state-sync-key' && value) {
+                            value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                        }
+                        data[id] = value;
+                    });
                     return data;
                 },
                 set: async (data) => {
-                    const tasks = [];
-                    for (const category in data) {
-                        for (const id in data[category]) {
-                            const value = data[category][id];
+                    // We need to Read-Update-Write for each category involved
+                    // To avoid race conditions in highly concurrent environments, this simple approach assumes single-client.
+                    // For better performance, we sort updates by category.
+
+                    const categories = Object.keys(data);
+
+                    for (const category of categories) {
+                        // 1. Fetch current category state
+                        const currentData = await readCategory(category);
+                        const updates = data[category];
+
+                        // 2. Apply updates
+                        let changed = false;
+                        for (const id in updates) {
+                            const value = updates[id];
                             if (value) {
-                                tasks.push(writeData(category, id, value));
+                                currentData[id] = value;
+                                changed = true;
                             } else {
-                                tasks.push(removeData(category, id));
+                                delete currentData[id];
+                                changed = true;
                             }
                         }
+
+                        // 3. Write back if changed
+                        if (changed) {
+                            await writeCategory(category, currentData);
+                        }
                     }
-                    await Promise.all(tasks);
                 }
             }
         },
-        saveCreds: () => {
-            return writeData('creds', null, creds);
+        saveCreds: async () => {
+            const stringified = JSON.stringify(creds, BufferJSON.replacer);
+            // Write creds logic similar to writeCategory but for single key
+            try {
+                const result = await databases.listDocuments(
+                    DATABASE_ID,
+                    CREDS_COLLECTION_ID,
+                    [require('node-appwrite').Query.equal('key', credsKey)]
+                );
+                if (result.documents.length > 0) {
+                    await databases.updateDocument(
+                        DATABASE_ID, CREDS_COLLECTION_ID, result.documents[0].$id, { data: stringified }
+                    );
+                } else {
+                    await databases.createDocument(
+                        DATABASE_ID, CREDS_COLLECTION_ID, ID.unique(), { key: credsKey, data: stringified, sessionId }
+                    );
+                }
+            } catch (e) {
+                console.error('Error saving creds:', e);
+            }
         }
     };
 };

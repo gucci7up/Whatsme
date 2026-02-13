@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Messages from './pages/Messages';
+import Settings from './pages/Settings';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -45,6 +47,16 @@ function App() {
                     <Route path="/account/:id" element={
                         <ProtectedRoute>
                             <AccountDetail />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/messages" element={
+                        <ProtectedRoute>
+                            <Messages />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/settings" element={
+                        <ProtectedRoute>
+                            <Settings />
                         </ProtectedRoute>
                     } />
                 </Routes>

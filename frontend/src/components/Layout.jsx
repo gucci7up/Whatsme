@@ -9,8 +9,8 @@ export default function Layout({ children }) {
 
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '#', icon: MessageSquare, label: 'Mensajes (Pronto)', disabled: true },
-        { path: '#', icon: Settings, label: 'Configuración', disabled: true },
+        { path: '/messages', icon: MessageSquare, label: 'Mensajes' },
+        { path: '/settings', icon: Settings, label: 'Configuración' },
     ];
 
     return (

@@ -90,7 +90,7 @@ export default function Settings() {
                                     <input
                                         type="text"
                                         defaultValue={user?.name}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 outline-none"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 outline-none text-green-600 font-semibold"
                                         readOnly // Appwrite user update logic needed
                                     />
                                 </div>

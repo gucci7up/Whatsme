@@ -222,7 +222,7 @@ export default function Messages() {
                         <select
                             value={selectedAccount?.$id || ''}
                             onChange={(e) => setSelectedAccount(accounts.find(a => a.$id === e.target.value))}
-                            className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-500"
+                            className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-500 text-green-600 font-semibold"
                         >
                             {accounts.map(acc => (
                                 <option key={acc.$id} value={acc.$id}>

@@ -178,13 +178,25 @@ class SessionManager {
         // Return chats sorted by timestamp
         const chats = store.chats.all();
         return chats.map(chat => {
-            // Enrich with last message if available in store.messages
-            // Note: Baileys store structure might vary, adapting basic fields
+            // Enrich with last message from store.messages
+            const messages = store.messages[chat.id] || [];
+            // Handle both array and dictionary styles if Baileys internal structure varies
+            const msgList = messages.toJSON ? messages.toJSON() : (Array.isArray(messages) ? messages : []);
+            const lastMsgObj = msgList.length > 0 ? msgList[msgList.length - 1] : null;
+
+            const body = lastMsgObj ? (
+                lastMsgObj.message?.conversation ||
+                lastMsgObj.message?.extendedTextMessage?.text ||
+                lastMsgObj.message?.imageMessage?.caption ||
+                (lastMsgObj.message ? '[Media]' : '')
+            ) : null;
+
             return {
                 id: chat.id,
                 name: chat.name || chat.verifiedName || chat.notify || chat.id.split('@')[0],
                 unreadCount: chat.unreadCount,
-                lastMessage: chat.lastMessageRecvTimestamp // We might need to fetch the actual msg body from messages
+                lastMessageTime: chat.lastMessageRecvTimestamp || (lastMsgObj ? lastMsgObj.messageTimestamp : null),
+                lastMessageBody: body
             };
         });
     }

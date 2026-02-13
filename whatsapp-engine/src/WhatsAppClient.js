@@ -33,9 +33,14 @@ class WhatsAppClient {
             } catch (e) { }
         }
 
+        console.log(`[${this.sessionId}] Loading Auth State...`);
         const { state, saveCreds } = await useAppwriteAuthState(this.sessionId);
-        const { version } = await fetchLatestBaileysVersion();
+        console.log(`[${this.sessionId}] Auth State Loaded. Creds exist: ${!!state.creds}`);
 
+        // Hardcoded version to prevent fetch timeout
+        const version = [2, 3000, 1015901307];
+
+        console.log(`[${this.sessionId}] Creating Socket...`);
         this.sock = makeWASocket({
             version,
             auth: state,
@@ -50,6 +55,7 @@ class WhatsAppClient {
                 }
             }
         });
+        console.log(`[${this.sessionId}] Socket Created.`);
 
         // Bind internal store for fast lookups
         this.store.bind(this.sock.ev);

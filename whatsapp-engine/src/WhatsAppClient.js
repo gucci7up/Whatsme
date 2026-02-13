@@ -158,7 +158,7 @@ class WhatsAppClient {
         }));
     }
 
-    async sendMessage(recipient, text) {
+    async sendMessage(recipient, text, mediaUrl = null) {
         if (!this.isReady) throw new Error('Client not ready');
 
         // Handle recipient formatting
@@ -167,7 +167,20 @@ class WhatsAppClient {
             chatId = `${chatId}@c.us`;
         }
 
-        await this.client.sendMessage(chatId, text);
+        if (mediaUrl) {
+            try {
+                const media = await MessageMedia.fromUrl(mediaUrl);
+                await this.client.sendMessage(chatId, media, { caption: text });
+                console.log(`[${this.sessionId}] Media sent to ${chatId}`);
+            } catch (e) {
+                console.error(`[${this.sessionId}] Error sending media:`, e);
+                // Fallback: Send text only + error warning? Or just fail?
+                // Let's fail so API knows.
+                throw new Error(`Failed to load media from URL: ${e.message}`);
+            }
+        } else {
+            await this.client.sendMessage(chatId, text);
+        }
     }
 
     async logout() {

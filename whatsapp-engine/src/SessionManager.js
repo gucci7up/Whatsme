@@ -72,9 +72,9 @@ class SessionManager {
         return await client.getMessages(chatId, limit);
     }
 
-    async sendMessage(sessionId, recipient, text) {
+    async sendMessage(sessionId, recipient, text, mediaUrl) {
         const client = await this.getClient(sessionId);
-        await client.sendMessage(recipient, text);
+        await client.sendMessage(recipient, text, mediaUrl);
     }
 }
 

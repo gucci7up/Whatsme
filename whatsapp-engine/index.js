@@ -59,9 +59,9 @@ app.post('/get-messages', async (req, res) => {
 });
 
 app.post('/send-message', authMiddleware, async (req, res) => {
-    const { accountId, recipient, content } = req.body;
+    const { accountId, recipient, content, mediaUrl } = req.body;
     try {
-        await SessionManager.sendMessage(accountId, recipient, content);
+        await SessionManager.sendMessage(accountId, recipient, content, mediaUrl);
         res.json({ success: true });
     } catch (error) {
         console.error('Send Message Error:', error);

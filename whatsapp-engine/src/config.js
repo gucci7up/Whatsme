@@ -17,10 +17,15 @@ const client = new Client()
 
 const databases = new Databases(client);
 
+// Gateway Security Key (For CRM Integration)
+// Default to a hardcoded value if not in ENV, but recommended to use ENV in Docker.
+const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY || 'whatsme_secure_api_key_12345';
+
 module.exports = {
     client,
     databases,
     DATABASE_ID,
     SESSIONS_COLLECTION_ID,
-    CREDS_COLLECTION_ID
+    CREDS_COLLECTION_ID,
+    API_KEY: GATEWAY_API_KEY // Export as API_KEY for middleware
 };

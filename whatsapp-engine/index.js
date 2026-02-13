@@ -11,9 +11,11 @@ app.use(cors());
 // Initialize Manager (Ensure DB collections exist, etc.)
 SessionManager.initialize().catch(console.error);
 
+const authMiddleware = require('./src/middleware/auth');
+
 // --- Routes ---
 
-app.post('/create-session', async (req, res) => {
+app.post('/create-session', authMiddleware, async (req, res) => {
     const { accountId } = req.body;
     try {
         await SessionManager.getClient(accountId, true); // Force Re-init
@@ -56,7 +58,7 @@ app.post('/get-messages', async (req, res) => {
     }
 });
 
-app.post('/send-message', async (req, res) => {
+app.post('/send-message', authMiddleware, async (req, res) => {
     const { accountId, recipient, content } = req.body;
     try {
         await SessionManager.sendMessage(accountId, recipient, content);
@@ -67,7 +69,7 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-app.post('/delete-session', async (req, res) => {
+app.post('/delete-session', authMiddleware, async (req, res) => {
     const { accountId } = req.body;
     try {
         await SessionManager.deleteSession(accountId);

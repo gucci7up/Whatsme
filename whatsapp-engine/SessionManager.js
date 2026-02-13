@@ -179,45 +179,19 @@ class SessionManager {
         const chats = store.chats.all();
         console.log(`GetChats for ${accountId}: Found ${chats.length} chats in store.`);
 
+        // Minimal Debug Mapping
         const mappedChats = chats.map(chat => {
-            try {
-                // Enrich with last message from store.messages
-                const messages = store.messages[chat.id] || [];
-                // Handle both array and dictionary styles if Baileys internal structure varies
-                const msgList = messages.toJSON ? messages.toJSON() : (Array.isArray(messages) ? messages : []);
-                const lastMsgObj = msgList.length > 0 ? msgList[msgList.length - 1] : null;
-
-                const body = lastMsgObj ? (
-                    lastMsgObj.message?.conversation ||
-                    lastMsgObj.message?.extendedTextMessage?.text ||
-                    lastMsgObj.message?.imageMessage?.caption ||
-                    (lastMsgObj.message ? '[Media]' : '')
-                ) : null;
-
-                // Timestamp preference: Chat's lastRecv -> Last Msg Timestamp -> 0
-                const timestamp = chat.lastMessageRecvTimestamp || (lastMsgObj ? lastMsgObj.messageTimestamp : 0);
-
-                return {
-                    id: chat.id,
-                    name: chat.name || chat.verifiedName || chat.notify || chat.id.split('@')[0],
-                    unreadCount: chat.unreadCount,
-                    lastMessageTime: timestamp,
-                    lastMessageBody: body
-                };
-            } catch (err) {
-                console.error(`Error mapping chat ${chat.id}:`, err);
-                return {
-                    id: chat.id,
-                    name: chat.name || 'Unknown',
-                    unreadCount: 0,
-                    lastMessageTime: 0,
-                    lastMessageBody: 'Error loading'
-                };
-            }
+            return {
+                id: chat.id,
+                name: chat.name || chat.verifiedName || chat.notify || chat.id.split('@')[0],
+                unreadCount: chat.unreadCount || 0,
+                lastMessageTime: chat.conversationTimestamp || 0,
+                lastMessageBody: '...'
+            };
         });
 
-        // Sort descending by time
-        mappedChats.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+        // Simple sort
+        mappedChats.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
 
         return mappedChats;
     }

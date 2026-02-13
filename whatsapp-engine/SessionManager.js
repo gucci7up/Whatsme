@@ -2,8 +2,266 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    makeInMemoryStore,
+    jidNormalizedUser
 } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
+const fs = require('fs');
+const pino = require('pino');
+const { Client, Databases } = require('node-appwrite');
+
+// Appwrite Configuration
+const ENDPOINT = 'https://appwrite.salamihost.lat/v1';
+const PROJECT_ID = '698dfafa0008a1cac12e';
+const API_KEY = 'standard_283500bceb6b99adc4facc9af02dc8ae8a67f0df57a29c47fef11670f82c3164ec4e5d0b02d2a7715ffe7c427d50d29a0d6b7ab718f7fbd81725ce11a76f0a536ca5a272783a703ddb259578c18b667dce608df789f9d97ed95709b67676e2d6fd3d0ae9c16df950c9d80ceac5e757dff949aa1e236b109496d17c935e896818';
+const DATABASE_ID = '698e1d2d002c90fa966a';
+const COLLECTION_ID = '698e1d2e00118abf1e1d';
+
+const client = new Client()
+    .setEndpoint(ENDPOINT)
+    .setProject(PROJECT_ID)
+    .setKey(API_KEY);
+
+const databases = new Databases(client);
+
+class SessionManager {
+    constructor() {
+        this.sessions = new Map(); // accountId -> socket
+        this.stores = new Map();   // accountId -> store
+    }
+
+    async updateDocument(accountId, data) {
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID, accountId, data);
+        } catch (err) {
+            console.error(`Failed to update Appwrite for ${accountId}:`, err.message);
+        }
+    }
+
+    async createSession(accountId) {
+        if (this.sessions.has(accountId)) {
+            return this.sessions.get(accountId);
+        }
+
+        // Ensure sessions directory exists
+        if (!fs.existsSync('sessions')) {
+            fs.mkdirSync('sessions');
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState(`sessions/session_${accountId}`);
+
+        // Initialize Store for this session
+        const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
+        const storeFile = `sessions/store_${accountId}.json`;
+        if (fs.existsSync(storeFile)) {
+            store.readFromFile(storeFile);
+        }
+        // Save store to file every 10s
+        setInterval(() => {
+            store.writeToFile(storeFile);
+        }, 10_000);
+
+        this.stores.set(accountId, store);
+
+        // Fetch version with timeout/fallback
+        let version, isLatest;
+        try {
+            console.log('Fetching latest WhatsApp version...');
+            const versionFetch = fetchLatestBaileysVersion();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Version fetch timeout')), 5000));
+            const result = await Promise.race([versionFetch, timeout]);
+            version = result.version;
+            isLatest = result.isLatest;
+            console.log(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
+        } catch (err) {
+            console.warn('Failed to fetch latest version, using fallback:', err.message);
+            version = [2, 3000, 1015901307]; // Fallback to a known recent version
+            isLatest = false;
+        }
+
+        const sock = makeWASocket({
+            version,
+            auth: state,
+            printQRInTerminal: true,
+            logger: pino({ level: 'info' }),
+            browser: ["Whatsme", "Chrome", "122.0.6261.94"], // Modern Chrome version
+            generateHighQualityLinkPreview: true,
+            syncFullHistory: true, // Enable full history sync for chat fetching
+        });
+
+        store.bind(sock.ev); // Bind store to socket events
+
+        this.sessions.set(accountId, sock);
+
+        // Update status to initializing
+        await this.updateDocument(accountId, { status: 'initializing', qr_code: null });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            console.log(`Connection Update for ${accountId}:`, JSON.stringify({ connection, qr: !!qr, lastDisconnect_error_status: lastDisconnect?.error?.output?.statusCode }, null, 2));
+
+            if (qr) {
+                // Generate QR as Data URL and push to Appwrite
+                console.log(`QR Code received for ${accountId}. Generating image...`);
+                try {
+                    const qrCode = await QRCode.toDataURL(qr);
+                    console.log(`QR generated successfully. Updating Appwrite...`);
+                    await this.updateDocument(accountId, {
+                        qr_code: qrCode,
+                        status: 'scanning'
+                    });
+                } catch (qrErr) {
+                    console.error('QR Generation Error:', qrErr);
+                }
+            }
+
+            if (connection === 'close') {
+                const disconnectError = lastDisconnect?.error;
+                const statusCode = disconnectError?.output?.statusCode;
+
+                console.error(`Connection Closed for ${accountId}. Status Code: ${statusCode}. Error:`, disconnectError);
+
+                // Always remove the closed socket from memory so createSession makes a new one
+                this.sessions.delete(accountId);
+
+                // 405 Method Not Allowed typically means the session/version is rejected.
+                // We should probably clear session and retry.
+                if (statusCode === 405) {
+                    console.log(`Error 405 detected. Clearing session for ${accountId} and retrying...`);
+                    const sessionDir = `sessions/session_${accountId}`;
+                    if (fs.existsSync(sessionDir)) {
+                        fs.rmSync(sessionDir, { recursive: true, force: true });
+                    }
+                    setTimeout(() => this.createSession(accountId), 2000);
+                    return;
+                }
+
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                console.log(`Should reconnect: ${shouldReconnect}`);
+
+                if (shouldReconnect) {
+                    // Retry with delay
+                    setTimeout(() => this.createSession(accountId), 2000);
+                } else {
+                    console.log(`Account ${accountId} logged out.`);
+                    await this.updateDocument(accountId, {
+                        status: 'disconnected',
+                        qr_code: null
+                    });
+                }
+            } else if (connection === 'open') {
+                console.log(`Account ${accountId} connected`);
+                await this.updateDocument(accountId, {
+                    status: 'connected',
+                    qr_code: null
+                });
+            }
+        });
+
+        return sock;
+    }
+
+    async getChats(accountId) {
+        if (!this.stores.has(accountId)) {
+            // Attempt to restore session if not in memory
+            await this.createSession(accountId);
+            // Wait briefly for store to populate?
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
+        const store = this.stores.get(accountId);
+        if (!store) throw new Error('Session not found or store not initialized');
+
+        // Return chats sorted by timestamp
+        const chats = store.chats.all();
+        return chats.map(chat => {
+            // Enrich with last message if available in store.messages
+            // Note: Baileys store structure might vary, adapting basic fields
+            return {
+                id: chat.id,
+                name: chat.name || chat.verifiedName || chat.notify || chat.id.split('@')[0],
+                unreadCount: chat.unreadCount,
+                lastMessage: chat.lastMessageRecvTimestamp // We might need to fetch the actual msg body from messages
+            };
+        });
+    }
+
+    async getMessages(accountId, chatId, limit = 50) {
+        if (!this.stores.has(accountId)) {
+            await this.createSession(accountId);
+        }
+
+        const store = this.stores.get(accountId);
+        if (!store) throw new Error('Session not found');
+
+        const messages = store.messages[chatId] || [];
+        // Convert to simple array and limit
+        const msgArray = messages.toJSON ? messages.toJSON() : messages.array || messages;
+
+        return msgArray.slice(-limit).map(m => ({
+            id: m.key.id,
+            fromMe: m.key.fromMe,
+            body: m.message?.conversation || m.message?.extendedTextMessage?.text || m.message?.imageMessage?.caption || '[Media/Other]',
+            timestamp: m.messageTimestamp
+        }));
+    }
+
+    async sendMessage(accountId, recipient, text) {
+        let sock = this.sessions.get(accountId);
+
+        // Auto-reconnect if session exists on disk but not in memory
+        if (!sock) {
+            console.log(`Session ${accountId} not in memory, attempting restore...`);
+            sock = await this.createSession(accountId);
+            // Wait for connection? Ideally we should wait for 'open' event
+            // For MVP, we might race here. 
+            // Improvements: WaitForConnection logic.
+            await new Promise(r => setTimeout(r, 3000)); // Hacky wait
+        }
+
+        // Ensure recipient format (append @s.whatsapp.net if missing)
+        const jid = recipient.includes('@') ? recipient : `${recipient.replace(/\D/g, '')}@s.whatsapp.net`;
+
+        await sock.sendMessage(jid, { text });
+    }
+
+    async deleteSession(accountId) {
+        console.log(`Deleting session for ${accountId}`);
+
+        // 1. Close socket if exists
+        if (this.sessions.has(accountId)) {
+            const sock = this.sessions.get(accountId);
+            sock.end(undefined); // Close connection
+            this.sessions.delete(accountId);
+        }
+
+        // Remove store
+        this.stores.delete(accountId);
+        const storeFile = `sessions/store_${accountId}.json`;
+        if (fs.existsSync(storeFile)) {
+            fs.unlinkSync(storeFile);
+        }
+
+        // 2. Delete session files
+        const sessionDir = `sessions/session_${accountId}`;
+        if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+        }
+
+        // 3. Update Appwrite status
+        await this.updateDocument(accountId, {
+            status: 'disconnected',
+            qr_code: null
+        });
+
+        console.log(`Session ${accountId} deleted and status reset.`);
+    }
+}
+
+module.exports = new SessionManager();
 const QRCode = require('qrcode');
 const fs = require('fs');
 const pino = require('pino');

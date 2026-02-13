@@ -40,6 +40,32 @@ app.post('/disconnect', async (req, res) => {
 
 
 
+app.post('/get-chats', async (req, res) => {
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+
+    try {
+        const chats = await sessionManager.getChats(accountId);
+        res.json(chats);
+    } catch (err) {
+        console.error('Error in /get-chats:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/get-messages', async (req, res) => {
+    const { accountId, chatId, limit } = req.body;
+    if (!accountId || !chatId) return res.status(400).json({ error: 'accountId and chatId required' });
+
+    try {
+        const messages = await sessionManager.getMessages(accountId, chatId, limit);
+        res.json(messages);
+    } catch (err) {
+        console.error('Error in /get-messages:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/send-message', async (req, res) => {
     const { accountId, recipient, content } = req.body;
     if (!accountId || !recipient || !content) {

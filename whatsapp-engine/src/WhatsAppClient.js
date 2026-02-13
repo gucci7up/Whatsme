@@ -1,120 +1,88 @@
-const {
-    default: makeWASocket,
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeInMemoryStore,
-    jidNormalizedUser,
-    Browsers
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const useAppwriteAuthState = require('./AppwriteAuth');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const { databases, SESSIONS_COLLECTION_ID, DATABASE_ID } = require('./config');
 const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
 
 class WhatsAppClient {
     constructor(sessionId) {
         this.sessionId = sessionId;
-        this.sock = null;
-        this.store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
+        this.client = null;
         this.isReady = false;
-        this.connectionState = 'connecting';
+
+        // Ensure session data directory exists
+        const sessionPath = path.join(__dirname, '..', '.wwebjs_auth');
+        if (!fs.existsSync(sessionPath)) {
+            fs.mkdirSync(sessionPath, { recursive: true });
+        }
     }
 
     async initialize() {
-        console.log(`[${this.sessionId}] Initializing client v2.0...`);
+        console.log(`[${this.sessionId}] Initializing whatsapp-web.js Client...`);
+        await this.updateStatus('initializing', null);
 
-        // Cleanup existing socket if any to prevent duplicate listeners
-        if (this.sock) {
-            try {
-                this.sock.end(undefined);
-                this.sock.ev.removeAllListeners('connection.update');
-                this.sock.ev.removeAllListeners('creds.update');
-                this.sock.ev.removeAllListeners('messages.upsert');
-            } catch (e) { }
-        }
-
-        console.log(`[${this.sessionId}] Loading Auth State...`);
-        const { state, saveCreds } = await useAppwriteAuthState(this.sessionId);
-        console.log(`[${this.sessionId}] Auth State Loaded. Creds exist: ${!!state.creds}`);
-
-        // Hardcoded version to prevent fetch timeout
-        const version = [2, 3000, 1015901307];
-
-        console.log(`[${this.sessionId}] Creating Socket...`);
-        this.sock = makeWASocket({
-            version,
-            auth: state,
-            printQRInTerminal: true,
-            logger: pino({ level: 'info' }), // Enable logs for debugging
-            browser: Browsers.macOS('Chrome'),
-            generateHighQualityLinkPreview: true,
-            syncFullHistory: false, // CRITICAL: Lazy loading to prevent hanging
-            options: {
-                headers: {
-                    'User-Agent': 'WhatsApp/2.22...' // Optional spoof
-                }
-            }
-        });
-        console.log(`[${this.sessionId}] Socket Created.`);
-
-        // Bind internal store for fast lookups
-        this.store.bind(this.sock.ev);
-
-        // Handle Creds Updates
-        this.sock.ev.on('creds.update', saveCreds);
-
-        // Handle Connection Events
-        this.sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr) {
-                console.log(`[${this.sessionId}] QR Generated`);
-                const qrData = await QRCode.toDataURL(qr);
-                await this.updateStatus('scanning', qrData);
-            }
-
-            if (connection === 'close') {
-                const reason = lastDisconnect?.error?.output?.statusCode;
-                console.log(`[${this.sessionId}] Connection closed: ${reason}`);
-
-                if (reason === DisconnectReason.loggedOut) {
-                    console.log(`[${this.sessionId}] Logged out.`);
-                    await this.updateStatus('disconnected', null);
-                    // Cleanup required?
-                } else if (reason === 405) {
-                    // Session corruption or conflict
-                    console.log(`[${this.sessionId}] 405 Error. Re-initializing...`);
-                    // We might need to wipe creds here?
-                } else {
-                    // Reconnect
-                    console.log(`[${this.sessionId}] Reconnecting...`);
-                    this.initialize();
-                }
-                this.isReady = false;
-            } else if (connection === 'open') {
-                console.log(`[${this.sessionId}] Connected!`);
-                this.isReady = true;
-
-                // Extract user info
-                // sock.user usually has format: { id: "12345:1@s.whatsapp.net", name: "Name" }
-                const user = this.sock.user;
-                const phoneNumber = user?.id ? user.id.split(':')[0] : '';
-                const pushName = user?.name || user?.notify || '';
-
-                await this.updateStatus('connected', null, phoneNumber, pushName);
+        this.client = new Client({
+            authStrategy: new LocalAuth({ clientId: this.sessionId }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ],
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
             }
         });
 
-        // Handle Messages (Persistence & UI updates would go here)
-        this.sock.ev.on('messages.upsert', async ({ messages, type }) => {
-            if (type === 'notify') {
-                // Here we could push webhooks or update specific chat in Appwrite
-                // For now, relies on in-memory store for 'get-messages' API
-                for (const msg of messages) {
-                    if (!msg.message) continue;
-                    // console.log(`[${this.sessionId}] New message from ${msg.key.remoteJid}`);
-                }
-            }
+        this.bindEvents();
+
+        console.log(`[${this.sessionId}] Starting Client...`);
+        this.client.initialize().catch(err => {
+            console.error(`[${this.sessionId}] Initialization failed:`, err);
+        });
+    }
+
+    bindEvents() {
+        this.client.on('qr', async (qr) => {
+            console.log(`[${this.sessionId}] QR Received`);
+            const qrData = await QRCode.toDataURL(qr);
+            await this.updateStatus('scanning', qrData);
+        });
+
+        this.client.on('ready', async () => {
+            console.log(`[${this.sessionId}] Client is Ready!`);
+            this.isReady = true;
+
+            // Get Info
+            const info = this.client.info;
+            const phoneNumber = info.wid.user;
+            const pushName = info.pushname;
+
+            await this.updateStatus('connected', null, phoneNumber, pushName);
+        });
+
+        this.client.on('authenticated', () => {
+            console.log(`[${this.sessionId}] Authenticated`);
+        });
+
+        this.client.on('auth_failure', async (msg) => {
+            console.error(`[${this.sessionId}] Auth Failure:`, msg);
+            await this.updateStatus('disconnected', null);
+        });
+
+        this.client.on('disconnected', async (reason) => {
+            console.log(`[${this.sessionId}] Disconnected:`, reason);
+            this.isReady = false;
+            await this.updateStatus('disconnected', null);
+        });
+
+        this.client.on('message', async (msg) => {
+            // console.log(`[${this.sessionId}] Message from ${msg.from}: ${msg.body.slice(0, 50)}...`);
+            // We can add webhook logic here later
         });
     }
 
@@ -138,61 +106,55 @@ class WhatsAppClient {
     // --- Public API Methods ---
 
     async getChats() {
-        const chats = this.store.chats.all();
-        // Normalize and sort
-        const mapped = chats.map(c => {
-            const msgs = this.store.messages[c.id] || [];
-            // Get last message safely
-            const msgArray = msgs.toJSON ? msgs.toJSON() : (Array.isArray(msgs) ? msgs : []);
-            const lastMsg = msgArray.length > 0 ? msgArray[msgArray.length - 1] : null;
+        if (!this.isReady) throw new Error('Client not ready');
 
-            return {
-                id: c.id,
-                name: c.name || c.verifiedName || c.notify || c.id.split('@')[0],
-                unreadCount: c.unreadCount || 0,
-                lastMessageTime: c.conversationTimestamp || (lastMsg ? lastMsg.messageTimestamp : 0),
-                lastMessageBody: lastMsg ? this.extractBody(lastMsg) : '...'
-            };
-        });
+        const chats = await this.client.getChats();
 
-        return mapped.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
+        return chats.map(c => ({
+            id: c.id._serialized,
+            name: c.name || c.id.user,
+            unreadCount: c.unreadCount,
+            lastMessageTime: c.timestamp, // Unix timestamp
+            lastMessageBody: c.lastMessage ? c.lastMessage.body : ''
+        }));
     }
 
     async getMessages(chatId, limit = 50) {
-        // Normalize JID
-        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
-        const msgs = this.store.messages[jid] || [];
+        if (!this.isReady) throw new Error('Client not ready');
 
-        const msgArray = msgs.toJSON ? msgs.toJSON() : (Array.isArray(msgs) ? msgs : []);
+        // Normalize JID if needed, but wwebjs expects serialized IDs usually
+        // If chatId doesn't have @c.us, append it? 
+        // Best to use the ID from getChats which is _serialized.
+        // Assuming frontend sends something like "123456@c.us"
 
-        const sorted = msgArray.sort((a, b) => (a.messageTimestamp || 0) - (b.messageTimestamp || 0));
-        const sliced = sorted.slice(-limit);
+        const chat = await this.client.getChatById(chatId);
+        const messages = await chat.fetchMessages({ limit });
 
-        return sliced.map(m => ({
-            id: m.key.id,
-            fromMe: m.key.fromMe,
-            body: this.extractBody(m),
-            timestamp: m.messageTimestamp
+        return messages.map(m => ({
+            id: m.id.id,
+            fromMe: m.fromMe,
+            body: m.body,
+            timestamp: m.timestamp
         }));
     }
 
     async sendMessage(recipient, text) {
-        const jid = recipient.includes('@') ? recipient : `${recipient.replace(/\D/g, '')}@s.whatsapp.net`;
-        await this.sock.sendMessage(jid, { text });
-    }
+        if (!this.isReady) throw new Error('Client not ready');
 
-    extractBody(m) {
-        return m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.message?.imageMessage?.caption ||
-            (m.message ? '[Media]' : '');
+        // Handle recipient formatting
+        let chatId = recipient;
+        if (!chatId.includes('@')) {
+            chatId = `${chatId}@c.us`;
+        }
+
+        await this.client.sendMessage(chatId, text);
     }
 
     async logout() {
         try {
-            await this.sock.logout();
-            this.store.chats.clear();
-            this.store.messages.clear();
+            await this.client.logout();
+            // Also explicitly destroy to close browser
+            await this.client.destroy();
         } catch (e) {
             console.error('Logout error:', e);
         }

@@ -40,13 +40,34 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const updatePassword = async (newPassword, oldPassword) => {
+        await account.updatePassword(newPassword, oldPassword);
+    };
+
+    const getSessions = async () => {
+        return await account.listSessions();
+    };
+
+    const deleteSession = async (sessionId) => {
+        await account.deleteSession(sessionId);
+    };
+
+    const updatePrefs = async (prefs) => {
+        const updatedUser = await account.updatePrefs(prefs);
+        setUser(updatedUser);
+    };
+
     const value = {
         user,
         loading,
         login,
         register,
         logout,
-        checkUserStatus
+        checkUserStatus,
+        updatePassword,
+        getSessions,
+        deleteSession,
+        updatePrefs
     };
 
     return (

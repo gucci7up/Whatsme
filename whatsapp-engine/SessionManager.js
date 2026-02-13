@@ -219,17 +219,34 @@ class SessionManager {
         const store = this.stores.get(accountId);
         if (!store) throw new Error('Session not found');
 
-        // Normalize JID if needed (ensure @s.whatsapp.net)
-        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+        // Normalize JID: Try exact match, then @s.whatsapp.net
+        let jid = chatId;
+        if (!store.messages[jid]) {
+            if (chatId.includes('@s.whatsapp.net')) {
+                // Try @c.us if not found
+                const alt = chatId.replace('@s.whatsapp.net', '@c.us');
+                if (store.messages[alt]) jid = alt;
+            } else if (!chatId.includes('@')) {
+                // Try appending suffix
+                jid = `${chatId}@s.whatsapp.net`;
+            }
+        }
 
-        console.log(`Fetching messages for ${accountId}, chat: ${jid}`);
+        console.log(`Fetching messages for ${accountId}, requested: ${chatId}, resolved: ${jid}`);
         const messages = store.messages[jid] || [];
         console.log(`Found ${messages.length || 0} messages in store`);
 
-        // Convert to simple array and limit
-        const msgArray = messages.toJSON ? messages.toJSON() : messages.array || messages;
+        // Convert to simple array
+        const msgArray = messages.toJSON ? messages.toJSON() : (messages.array || messages);
+        const safeArray = Array.isArray(msgArray) ? msgArray : [];
 
-        return msgArray.slice(-limit).map(m => ({
+        // Sort by timestamp ASCENDING (Oldest -> Newest) before slicing
+        safeArray.sort((a, b) => (a.messageTimestamp || 0) - (b.messageTimestamp || 0));
+
+        // Take the last 'limit' messages (Newest)
+        const sliced = safeArray.slice(-limit);
+
+        return sliced.map(m => ({
             id: m.key.id,
             fromMe: m.key.fromMe,
             body: m.message?.conversation || m.message?.extendedTextMessage?.text || m.message?.imageMessage?.caption || '[Media/Other]',

@@ -1,7 +1,8 @@
 const { databases, DATABASE_ID, CREDS_COLLECTION_ID, SESSIONS_COLLECTION_ID } = require('./config');
 const WhatsAppClient = require('./WhatsAppClient');
 const { ID } = require('node-appwrite');
-const { clearAuthState } = require('./AppwriteAuth');
+const fs = require('fs');
+const path = require('path');
 
 class SessionManager {
     constructor() {
@@ -37,11 +38,15 @@ class SessionManager {
             this.clients.delete(sessionId);
         }
 
-        // 2. Wipe Creds from Appwrite (CRITICAL for generating new QR)
-        try {
-            await clearAuthState(sessionId);
-        } catch (e) {
-            console.error(`Error wiping creds for ${sessionId}:`, e);
+        // 2. Wipe Local Auth Folder (puppeteer session)
+        const sessionPath = path.join(__dirname, '..', '.wwebjs_auth', `session-${sessionId}`);
+        if (fs.existsSync(sessionPath)) {
+            try {
+                fs.rmSync(sessionPath, { recursive: true, force: true });
+                console.log(`[${sessionId}] Local auth folder deleted.`);
+            } catch (e) {
+                console.error(`[${sessionId}] Error deleting local auth folder:`, e);
+            }
         }
 
         // 3. Reset Status in Sessions Collection

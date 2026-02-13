@@ -34,9 +34,12 @@ class WhatsAppClient {
                     '--no-zygote',
                     '--disable-gpu'
                 ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'
             }
         });
+
+        // Debug Log
+        console.log(`[${this.sessionId}] Puppeteer executablePath: ${process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'}`);
 
         this.bindEvents();
 

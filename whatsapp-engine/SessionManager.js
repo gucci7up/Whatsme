@@ -87,7 +87,7 @@ class SessionManager {
             logger: pino({ level: 'info' }),
             browser: ["Whatsme", "Chrome", "122.0.6261.94"], // Modern Chrome version
             generateHighQualityLinkPreview: true,
-            syncFullHistory: true, // Enable full history sync for chat fetching
+            syncFullHistory: false, // Disable full history to prevent login stalls
         });
 
         store.bind(sock.ev); // Bind store to socket events

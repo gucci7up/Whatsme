@@ -1,6 +1,10 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache git
+# Install Chromium and dependencies
+# CACHEBUST: 2026-02-13-v2 (Force Rebuild)
+RUN apk add --no-cache \
+    git \
+    chromium
 
 WORKDIR /app
 

@@ -21,6 +21,23 @@ class WhatsAppClient {
         console.log(`[${this.sessionId}] Initializing whatsapp-web.js Client...`);
         await this.updateStatus('initializing', null);
 
+        // Find Chromium Executable
+        const possiblePaths = [
+            process.env.PUPPETEER_EXECUTABLE_PATH,
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/usr/bin/google-chrome-stable'
+        ].filter(Boolean);
+
+        let executablePath = possiblePaths.find(p => fs.existsSync(p));
+
+        if (!executablePath) {
+            console.error(`[${this.sessionId}] CRITICAL: Chromium not found in paths: ${possiblePaths.join(', ')}`);
+            // Fallback to Puppeteer's default logic if nothing found (might still fail)
+        } else {
+            console.log(`[${this.sessionId}] Using Chromium at: ${executablePath}`);
+        }
+
         this.client = new Client({
             authStrategy: new LocalAuth({ clientId: this.sessionId }),
             puppeteer: {
@@ -34,7 +51,7 @@ class WhatsAppClient {
                     '--no-zygote',
                     '--disable-gpu'
                 ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'
+                executablePath: executablePath // Pass the found path
             }
         });
 

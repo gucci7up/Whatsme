@@ -78,7 +78,14 @@ class WhatsAppClient {
             } else if (connection === 'open') {
                 console.log(`[${this.sessionId}] Connected!`);
                 this.isReady = true;
-                await this.updateStatus('connected', null);
+
+                // Extract user info
+                // sock.user usually has format: { id: "12345:1@s.whatsapp.net", name: "Name" }
+                const user = this.sock.user;
+                const phoneNumber = user?.id ? user.id.split(':')[0] : '';
+                const pushName = user?.name || user?.notify || '';
+
+                await this.updateStatus('connected', null, phoneNumber, pushName);
             }
         });
 
@@ -95,13 +102,17 @@ class WhatsAppClient {
         });
     }
 
-    async updateStatus(status, qrCode) {
+    async updateStatus(status, qrCode, phoneNumber = null, pushName = null) {
         try {
+            const data = { status, qr_code: qrCode };
+            if (phoneNumber) data.phoneNumber = phoneNumber;
+            if (pushName) data.pushName = pushName;
+
             await databases.updateDocument(
                 DATABASE_ID,
                 SESSIONS_COLLECTION_ID,
                 this.sessionId,
-                { status, qr_code: qrCode }
+                data
             );
         } catch (e) {
             console.error(`[${this.sessionId}] Status update failed:`, e.message);

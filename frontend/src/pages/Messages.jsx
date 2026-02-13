@@ -69,15 +69,14 @@ export default function Messages() {
         try {
             // Using the endpoint assumed from context
             const res = await axios.post('https://api.losmuchachos.es/get-chats', { accountId });
-            // API likely returns array of { id, name, unreadCount, etc }
-            // Ensure data structure matches UI expectations or map it
+            // API returns array of { id, name, unreadCount, lastMessage (timestamp) }
             const mappedChats = res.data.map(chat => ({
-                id: chat.id._serialized, // WhatsApp ID
-                name: chat.name || chat.id.user,
-                lastMessage: chat.lastMessage?.body || 'Start thinking for yourself...', // Placeholder if missing
-                time: chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                id: chat.id, // Baileys returns JID string directly
+                name: chat.name || chat.id.split('@')[0],
+                lastMessage: '...', // Baileys store simple chat object doesn't have msg content by default, implies fetching
+                time: chat.lastMessage ? new Date(chat.lastMessage * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
                 unread: chat.unreadCount,
-                avatar: `https://ui-avatars.com/api/?name=${chat.name || 'User'}&background=random` // Placeholder avatar
+                avatar: `https://ui-avatars.com/api/?name=${chat.name || 'User'}&background=random`
             }));
             setChats(mappedChats);
         } catch (error) {

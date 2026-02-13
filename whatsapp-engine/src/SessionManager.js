@@ -1,6 +1,7 @@
-const { databases, DATABASE_ID, CREDS_COLLECTION_ID } = require('./config');
+const { databases, DATABASE_ID, CREDS_COLLECTION_ID, SESSIONS_COLLECTION_ID } = require('./config');
 const WhatsAppClient = require('./WhatsAppClient');
 const { ID } = require('node-appwrite');
+const { clearAuthState } = require('./AppwriteAuth');
 
 class SessionManager {
     constructor() {
@@ -9,11 +10,6 @@ class SessionManager {
 
     async initialize() {
         console.log('Initializing SessionManager...');
-        // Ensure CREDS collection exists? 
-        // Appwrite Node SDK doesn't easily allow "create collection if not exists" without Admin API Keys usually.
-        // We will assume it exists or try to handle errors dynamically.
-        // Use a dummy check:
-        // await this.checkCollection();
     }
 
     async getClient(sessionId) {
@@ -28,15 +24,29 @@ class SessionManager {
     }
 
     async deleteSession(sessionId) {
+        // 1. Logout & Clear Memory
         if (this.clients.has(sessionId)) {
             const client = this.clients.get(sessionId);
             await client.logout();
             this.clients.delete(sessionId);
         }
 
-        // Also wipe creds from Appwrite? 
-        // Our AppwriteAuth doesn't expose a "wipe all" method easily, but we can do it by querying keys starting with sessionId
-        console.log(`Session ${sessionId} deleted locally. Appwrite creds remain for safety unless manual cleanup.`);
+        // 2. Wipe Creds from Appwrite (CRITICAL for generating new QR)
+        try {
+            await clearAuthState(sessionId);
+        } catch (e) {
+            console.error(`Error wiping creds for ${sessionId}:`, e);
+        }
+
+        // 3. Reset Status in Sessions Collection
+        try {
+            await databases.updateDocument(
+                DATABASE_ID,
+                SESSIONS_COLLECTION_ID, // Ensure we have access to ID
+                sessionId,
+                { status: 'disconnected', qr_code: null }
+            );
+        } catch (e) { }
     }
 
     // --- Proxy Methods to Client ---

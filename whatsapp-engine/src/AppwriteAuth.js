@@ -161,3 +161,26 @@ module.exports = async function useAppwriteAuthState(sessionId) {
         }
     };
 };
+
+module.exports.clearAuthState = async function (sessionId) {
+    const { databases, DATABASE_ID, CREDS_COLLECTION_ID } = require('./config');
+    const { Query } = require('node-appwrite');
+
+    try {
+        console.log(`[${sessionId}] Clearing Auth State from Appwrite...`);
+        const result = await databases.listDocuments(
+            DATABASE_ID,
+            CREDS_COLLECTION_ID,
+            [Query.equal('sessionId', sessionId)]
+        );
+
+        const deletePromises = result.documents.map(doc =>
+            databases.deleteDocument(DATABASE_ID, CREDS_COLLECTION_ID, doc.$id)
+        );
+
+        await Promise.all(deletePromises);
+        console.log(`[${sessionId}] Auth State Cleared (${deletePromises.length} docs).`);
+    } catch (e) {
+        console.error(`[${sessionId}] Error clearing auth state:`, e.message);
+    }
+};

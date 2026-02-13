@@ -1,6 +1,4 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Settings, LogOut, BookOpen } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Settings, LogOut, HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
@@ -10,7 +8,7 @@ export default function Layout({ children }) {
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Mensajes' },
-        { path: '/docs', icon: BookOpen, label: 'Documentación' },
+        { path: '/docs', icon: HelpCircle, label: 'Documentación' },
         { path: '/settings', icon: Settings, label: 'Configuración' },
     ];
 

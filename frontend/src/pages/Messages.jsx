@@ -15,6 +15,7 @@ export default function Messages() {
     const [loading, setLoading] = useState(true);
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [lastNotifiedId, setLastNotifiedId] = useState(null);
 
     // Fetch Accounts on Mount
     useEffect(() => {

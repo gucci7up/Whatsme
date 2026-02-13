@@ -102,7 +102,36 @@ class WhatsAppClient {
 
         this.client.on('message', async (msg) => {
             // console.log(`[${this.sessionId}] Message from ${msg.from}: ${msg.body.slice(0, 50)}...`);
-            // We can add webhook logic here later
+
+            // Webhook Dispatcher
+            const { WEBHOOK_URL } = require('./config');
+            if (WEBHOOK_URL) {
+                try {
+                    const axios = require('axios');
+                    const payload = {
+                        event: 'message',
+                        sessionId: this.sessionId,
+                        data: {
+                            id: msg.id.id,
+                            from: msg.from,
+                            to: msg.to,
+                            body: msg.body,
+                            hasMedia: msg.hasMedia,
+                            type: msg.type,
+                            timestamp: msg.timestamp,
+                            author: msg.author,
+                            pushName: (await msg.getContact()).pushname
+                        }
+                    };
+
+                    // Fire and forget (don't await to avoid blocking chat)
+                    axios.post(WEBHOOK_URL, payload)
+                        .then(() => console.log(`[${this.sessionId}] Webhook sent to ${WEBHOOK_URL}`))
+                        .catch(err => console.error(`[${this.sessionId}] Webhook failed:`, err.message));
+                } catch (e) {
+                    console.error('Webhook processing error:', e);
+                }
+            }
         });
     }
 

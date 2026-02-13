@@ -27,5 +27,6 @@ module.exports = {
     DATABASE_ID,
     SESSIONS_COLLECTION_ID,
     CREDS_COLLECTION_ID,
-    API_KEY: GATEWAY_API_KEY // Export as API_KEY for middleware
+    API_KEY: GATEWAY_API_KEY, // Export as API_KEY for middleware
+    WEBHOOK_URL: process.env.WEBHOOK_URL // URL to send incoming messages to
 };

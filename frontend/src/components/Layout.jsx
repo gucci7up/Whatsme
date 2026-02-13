@@ -1,5 +1,6 @@
 import { LayoutDashboard, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Link, useLocation } from 'react-router-dom';
 
 export default function Layout({ children }) {
     const location = useLocation();

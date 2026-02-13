@@ -197,7 +197,13 @@ class SessionManager {
         const store = this.stores.get(accountId);
         if (!store) throw new Error('Session not found');
 
-        const messages = store.messages[chatId] || [];
+        // Normalize JID if needed (ensure @s.whatsapp.net)
+        const jid = chatId.includes('@') ? chatId : `${chatId}@s.whatsapp.net`;
+
+        console.log(`Fetching messages for ${accountId}, chat: ${jid}`);
+        const messages = store.messages[jid] || [];
+        console.log(`Found ${messages.length || 0} messages in store`);
+
         // Convert to simple array and limit
         const msgArray = messages.toJSON ? messages.toJSON() : messages.array || messages;
 

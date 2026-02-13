@@ -57,12 +57,19 @@ export default function Messages() {
         }
     }, [selectedAccount]);
 
-    // Fetch Messages when Chat Changes
+    // Poll Messages when Chat is Selected
     useEffect(() => {
+        let interval;
         if (selectedAccount && selectedChat) {
-            fetchMessages(selectedAccount.$id, selectedChat.id._serialized); // Assuming remoteId or similar
+            // Initial fetch
+            fetchMessages(selectedAccount.$id, selectedChat.id);
+            // Poll every 3 seconds
+            interval = setInterval(() => {
+                fetchMessages(selectedAccount.$id, selectedChat.id, true); // true = silent loading
+            }, 3000);
         }
-    }, [selectedChat]);
+        return () => clearInterval(interval);
+    }, [selectedChat, selectedAccount]);
 
     const fetchChats = async (accountId) => {
         setLoadingChats(true);
@@ -73,7 +80,7 @@ export default function Messages() {
             const mappedChats = res.data.map(chat => ({
                 id: chat.id, // Baileys returns JID string directly
                 name: chat.name || chat.id.split('@')[0],
-                lastMessage: '...', // Baileys store simple chat object doesn't have msg content by default, implies fetching
+                lastMessage: chat.lastMessage ? 'Start thinking for yourself...' : '', // Baileys store simple chat object doesn't have msg content by default, implies fetching
                 time: chat.lastMessage ? new Date(chat.lastMessage * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
                 unread: chat.unreadCount,
                 avatar: `https://ui-avatars.com/api/?name=${chat.name || 'User'}&background=random`
@@ -88,8 +95,8 @@ export default function Messages() {
         }
     };
 
-    const fetchMessages = async (accountId, chatId) => {
-        setLoadingMessages(true);
+    const fetchMessages = async (accountId, chatId, silent = false) => {
+        if (!silent) setLoadingMessages(true);
         try {
             const res = await axios.post('https://api.losmuchachos.es/get-messages', {
                 accountId,
@@ -97,16 +104,19 @@ export default function Messages() {
                 limit: 50
             });
             const mappedMessages = res.data.map(msg => ({
-                id: msg.id._serialized,
+                id: msg.id,
                 text: msg.body,
                 sender: msg.fromMe ? 'me' : 'other',
                 time: new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }));
-            setMessages(mappedMessages.reverse()); // Assume API returns newest first
+            // Only update if different? For now just set.
+            // Check if we have new messages to avoid cursor jump? 
+            // Simple set for now.
+            setMessages(mappedMessages.reverse());
         } catch (error) {
             console.error('Error fetching messages:', error);
         } finally {
-            setLoadingMessages(false);
+            if (!silent) setLoadingMessages(false);
         }
     };
 

@@ -8,7 +8,7 @@ export default function Layout({ children }) {
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Mensajes' },
-        { path: '/docs', icon: HelpCircle, label: 'Documentación' },
+        // { path: '/docs', icon: HelpCircle, label: 'Documentación' }, // Commented out
         { path: '/settings', icon: Settings, label: 'Configuración' },
     ];
 

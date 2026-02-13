@@ -54,6 +54,11 @@ function App() {
                             <Messages />
                         </ProtectedRoute>
                     } />
+                    <Route path="/docs" element={
+                        <ProtectedRoute>
+                            <Documentation />
+                        </ProtectedRoute>
+                    } />
                     <Route path="/settings" element={
                         <ProtectedRoute>
                             <Settings />

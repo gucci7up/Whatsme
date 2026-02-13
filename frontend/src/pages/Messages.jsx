@@ -62,7 +62,62 @@ export default function Messages() {
         return () => clearInterval(interval);
     }, [selectedAccount]);
 
-    // ... (Notification logic) ...
+    // Request Notification Permission on mount
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    // Notify on new distinct message
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+
+            // If it's a new message ID we haven't notified about, and it's NOT from me
+            if (lastMsg.id !== lastNotifiedId && lastMsg.sender !== 'me') {
+                setLastNotifiedId(lastMsg.id);
+
+                if (!loadingMessages) { // Skip notification on initial full load
+                    // Play Sound
+                    try {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple beep
+                        audio.play().catch(e => console.log('Audio play failed', e));
+                    } catch (e) {
+                        console.error('Audio error', e);
+                    }
+
+                    // Show Notification
+                    if (Notification.permission === 'granted') {
+                        new Notification(`Nuevo mensaje de ${selectedChat?.name}`, {
+                            body: lastMsg.text,
+                        });
+                    }
+                } else {
+                    // Initial load, just update the tracker without notifying
+                    setLastNotifiedId(lastMsg.id);
+                }
+            }
+        }
+    }, [messages, selectedChat, lastNotifiedId, loadingMessages]);
+
+    // Poll Messages when Chat is Selected
+    useEffect(() => {
+        let interval;
+        if (selectedAccount && selectedChat) {
+            // Initial fetch
+            fetchMessages(selectedAccount.$id, selectedChat.id);
+            // Poll every 3 seconds
+            interval = setInterval(() => {
+                fetchMessages(selectedAccount.$id, selectedChat.id, true); // true = silent loading
+            }, 3000);
+        }
+        return () => clearInterval(interval);
+    }, [selectedChat, selectedAccount]);
+
+    // Notify on new messages (Legacy/Redundant check cleanup)
+    // Kept empty to match previous structure cleaning
+
 
     const fetchChats = async (accountId, silent = false) => {
         if (!silent) setLoadingChats(true);

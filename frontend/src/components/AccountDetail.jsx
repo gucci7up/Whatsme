@@ -212,6 +212,7 @@ export default function AccountDetail() {
                                         <pre className="bg-slate-800 p-2 rounded border border-slate-700 whitespace-pre-wrap break-all">
                                             {`curl -X POST https://api.losmuchachos.es/send-message \\
 -H "Content-Type: application/json" \\
+-H "x-api-key: whatsme_secure_api_key_12345" \\
 -d '{
   "accountId": "${account.$id}",
   "recipient": "1234567890",

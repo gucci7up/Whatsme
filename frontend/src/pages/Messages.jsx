@@ -57,6 +57,55 @@ export default function Messages() {
         }
     }, [selectedAccount]);
 
+    // Request Notification Permission on mount
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    // Notify on new distinct message
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+
+            // If it's a new message ID we haven't notified about, and it's NOT from me
+            if (lastMsg.id !== lastNotifiedId && lastMsg.sender !== 'me') {
+                setLastNotifiedId(lastMsg.id);
+
+                // Only notify if the message is reasonably recent (e.g., within last minute) to avoid notifying on chat load
+                // (Assuming we might want to notify only for *freshly arrived* messages during polling)
+                // For now, let's just checking if it is different from the one when we opened the chat?
+                // Actually, the first load sets 'lastNotifiedId' implicitly? No.
+                // Hack: If 'loadingMessages' is true, don't notify (it's initial load).
+
+                // Wait, 'loadingMessages' is false during polling (silent=true). 
+                // So this logic works for polling.
+
+                if (!loadingMessages) { // Skip notification on initial full load
+                    // Play Sound
+                    try {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Simple beep
+                        audio.play().catch(e => console.log('Audio play failed', e));
+                    } catch (e) {
+                        console.error('Audio error', e);
+                    }
+
+                    // Show Notification
+                    if (Notification.permission === 'granted') {
+                        new Notification(`Nuevo mensaje de ${selectedChat?.name}`, {
+                            body: lastMsg.text,
+                            // icon: selectedChat?.avatar // CORS issues often prevent this, omit for now
+                        });
+                    }
+                } else {
+                    // Initial load, just update the tracker without notifying
+                    setLastNotifiedId(lastMsg.id);
+                }
+            }
+        }
+    }, [messages, selectedChat]);
+
     // Poll Messages when Chat is Selected
     useEffect(() => {
         let interval;
@@ -70,6 +119,19 @@ export default function Messages() {
         }
         return () => clearInterval(interval);
     }, [selectedChat, selectedAccount]);
+
+    // Notify on new messages
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            // Check if last message is new (compare unique ID or timestamp?) 
+            // For simplicity in this poll-based approach, we check if it's from 'other' and very recent (e.g. last 5s)
+            // But 'messages' state update causes this trigger. 
+            // We need to track 'lastKnownMessageId' to avoid re-notifying on every poll if no new msg.
+
+            // Actually, let's use a ref or state to store the last message ID we notified about.
+        }
+    }, [messages]);
 
     const fetchChats = async (accountId) => {
         setLoadingChats(true);

@@ -1,5 +1,4 @@
-import React from 'react';
-import { BookOpen, Key, Webhook, Image, Code, CheckCircle, Shield } from 'lucide-react';
+import { Key, Webhook, Code, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Documentation() {
